@@ -4,15 +4,17 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Check, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { 
   ModelType, 
   ModelDefinition,
+  ImageApiFormat,
   ChatModelParams,
   ImageModelParams,
   VideoModelParams,
   DEFAULT_CHAT_PARAMS,
   DEFAULT_IMAGE_PARAMS,
+  DEFAULT_IMAGE_PARAMS_OPENAI,
   DEFAULT_VIDEO_PARAMS_SORA,
   DEFAULT_VIDEO_PARAMS_VEO,
   DEFAULT_VIDEO_PARAMS_DOUBAO_SEEDANCE,
@@ -35,6 +37,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ type, onSave, onCancel }) =
   const [description, setDescription] = useState('');
   const [endpoint, setEndpoint] = useState('');
   const [apiKey, setApiKey] = useState('');
+  const [imageApiFormat, setImageApiFormat] = useState<ImageApiFormat>('gemini');
   const [videoMode, setVideoMode] = useState<'sync' | 'async' | 'task'>('sync');
   
   // 提供商配置
@@ -44,9 +47,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ type, onSave, onCancel }) =
   const [customProviderBaseUrl, setCustomProviderBaseUrl] = useState('');
   const [customProviderApiKey, setCustomProviderApiKey] = useState('');
   
-  // 展开高级选项
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
   useEffect(() => {
     if (type !== 'video' || providerMode !== 'existing' || videoMode !== 'task') return;
     const volcengineProvider = existingProviders.find(
@@ -90,8 +90,16 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ type, onSave, onCancel }) =
       params = { ...DEFAULT_CHAT_PARAMS };
       if (!resolvedEndpoint) resolvedEndpoint = '/v1/chat/completions';
     } else if (type === 'image') {
-      params = { ...DEFAULT_IMAGE_PARAMS };
-      if (!resolvedEndpoint) resolvedEndpoint = '/v1beta/models/{model}:generateContent';
+      params =
+        imageApiFormat === 'openai'
+          ? { ...DEFAULT_IMAGE_PARAMS_OPENAI }
+          : { ...DEFAULT_IMAGE_PARAMS };
+      if (!resolvedEndpoint) {
+        resolvedEndpoint =
+          imageApiFormat === 'openai'
+            ? '/v1/images/generations'
+            : '/v1beta/models/{model}:generateContent';
+      }
     } else {
       params =
         videoMode === 'sync'
@@ -167,6 +175,38 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ type, onSave, onCancel }) =
         />
       </div>
 
+      {/* 图片模型特有选项 */}
+      {type === 'image' && (
+        <div>
+          <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">图片 API 协议</label>
+          <div className="grid grid-cols-1 gap-2">
+            <button
+              onClick={() => setImageApiFormat('gemini')}
+              className={`flex-1 py-2 text-xs rounded transition-colors ${
+                imageApiFormat === 'gemini'
+                  ? 'bg-[var(--accent)] text-[var(--text-primary)]'
+                  : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
+              }`}
+            >
+              Gemini GenerateContent
+            </button>
+            <button
+              onClick={() => setImageApiFormat('openai')}
+              className={`flex-1 py-2 text-xs rounded transition-colors ${
+                imageApiFormat === 'openai'
+                  ? 'bg-[var(--accent)] text-[var(--text-primary)]'
+                  : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
+              }`}
+            >
+              OpenAI Images（支持参考图）
+            </button>
+          </div>
+          <p className="text-[9px] text-[var(--text-muted)] mt-1">
+            OpenAI 协议下无参考图走 `/v1/images/generations`，带参考图会自动走 `/v1/images/edits`。
+          </p>
+        </div>
+      )}
+
       {/* API 端点 */}
       <div>
         <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">API 端点 (Endpoint)</label>
@@ -174,7 +214,15 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ type, onSave, onCancel }) =
           type="text"
           value={endpoint}
           onChange={(e) => setEndpoint(e.target.value)}
-          placeholder={type === 'chat' ? '/v1/chat/completions' : type === 'image' ? '/v1beta/models/{model}:generateContent' : '/v1/videos 或 /api/v3/contents/generations/tasks'}
+          placeholder={
+            type === 'chat'
+              ? '/v1/chat/completions'
+              : type === 'image'
+                ? imageApiFormat === 'openai'
+                  ? '/v1/images/generations'
+                  : '/v1beta/models/{model}:generateContent'
+                : '/v1/videos 或 /api/v3/contents/generations/tasks'
+          }
           className="w-full bg-[var(--bg-hover)] border border-[var(--border-secondary)] rounded px-3 py-2 text-xs text-[var(--text-primary)] placeholder:text-[var(--text-muted)] font-mono"
         />
         <p className="text-[9px] text-[var(--text-muted)] mt-1">

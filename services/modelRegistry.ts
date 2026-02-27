@@ -127,6 +127,22 @@ export const loadRegistry = (): ModelRegistryState => {
         }
       });
 
+      // 按代码中的内置顺序重排内置模型，保证 UI 展示顺序一致
+      // 自定义模型保持在内置模型之后，并保持各自相对顺序
+      const builtInModelOrder = new Map(ALL_BUILTIN_MODELS.map((m, index) => [m.id, index]));
+      const modelIdsBeforeReorder = parsed.models.map(m => m.id).join('|');
+      parsed.models = parsed.models
+        .map((model, index) => ({ model, index }))
+        .sort((a, b) => {
+          const aOrder = builtInModelOrder.has(a.model.id) ? (builtInModelOrder.get(a.model.id) as number) : Number.MAX_SAFE_INTEGER;
+          const bOrder = builtInModelOrder.has(b.model.id) ? (builtInModelOrder.get(b.model.id) as number) : Number.MAX_SAFE_INTEGER;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return a.index - b.index;
+        })
+        .map(item => item.model);
+      const modelIdsAfterReorder = parsed.models.map(m => m.id).join('|');
+      const modelsReordered = modelIdsBeforeReorder !== modelIdsAfterReorder;
+
       // 迁移缺失的 apiModel（优先从 id 或 providerId 前缀推断）
       parsed.models = parsed.models.map(m => {
         if (m.apiModel) return m;
@@ -168,7 +184,7 @@ export const loadRegistry = (): ModelRegistryState => {
       registryState = parsed;
 
       // 如果发生了迁移，立即回写 localStorage，避免每次加载都重复执行
-      if (modelsRemoved > 0 || activeModelMigrated) {
+      if (modelsRemoved > 0 || activeModelMigrated || modelsReordered) {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
           console.log(`🔄 模型注册中心迁移完成：清理 ${modelsRemoved} 个废弃模型`);

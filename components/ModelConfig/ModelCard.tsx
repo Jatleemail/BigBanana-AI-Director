@@ -91,23 +91,28 @@ const ModelCard: React.FC<ModelCardProps> = ({
   );
 
   const renderImageParams = (params: ImageModelParams) => (
-    <div>
-      <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">默认比例</label>
-      <div className="flex gap-2">
-        {/* 从模型的 supportedAspectRatios 读取支持的比例 */}
-        {(params.supportedAspectRatios || ['16:9', '9:16']).map((ratio) => (
-          <button
-            key={ratio}
-            onClick={() => handleParamChange('defaultAspectRatio', ratio)}
-            className={`px-3 py-1.5 text-xs rounded transition-colors ${
-              editParams.defaultAspectRatio === ratio
-                ? 'bg-[var(--accent)] text-[var(--text-primary)]'
-                : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
-            }`}
-          >
-            {ratio === '16:9' ? '横屏' : ratio === '9:16' ? '竖屏' : '方形'}
-          </button>
-        ))}
+    <div className="space-y-3">
+      <div className="text-[10px] text-[var(--text-muted)]">
+        协议：{params.apiFormat === 'openai' ? 'OpenAI Images' : 'Gemini GenerateContent'}
+      </div>
+      <div>
+        <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">默认比例</label>
+        <div className="flex gap-2">
+          {/* 从模型的 supportedAspectRatios 读取支持的比例 */}
+          {(params.supportedAspectRatios || ['16:9', '9:16']).map((ratio) => (
+            <button
+              key={ratio}
+              onClick={() => handleParamChange('defaultAspectRatio', ratio)}
+              className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                editParams.defaultAspectRatio === ratio
+                  ? 'bg-[var(--accent)] text-[var(--text-primary)]'
+                  : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
+              }`}
+            >
+              {ratio === '16:9' ? '横屏' : ratio === '9:16' ? '竖屏' : '方形'}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );

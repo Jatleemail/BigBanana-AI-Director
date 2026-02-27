@@ -18,6 +18,13 @@ export type ModelType = 'chat' | 'image' | 'video';
 export type AspectRatio = '16:9' | '9:16' | '1:1';
 
 /**
+ * 图片模型 API 协议类型
+ * gemini: Google generateContent 风格
+ * openai: OpenAI Images API 风格
+ */
+export type ImageApiFormat = 'gemini' | 'openai';
+
+/**
  * 视频时长类型（仅异步视频模式支持）
  */
 export type VideoDuration = 4 | 5 | 8 | 10 | 12 | 15;
@@ -48,6 +55,7 @@ export interface ChatModelParams {
 export interface ImageModelParams {
   defaultAspectRatio: AspectRatio;
   supportedAspectRatios: AspectRatio[];
+  apiFormat?: ImageApiFormat;
 }
 
 /**
@@ -209,6 +217,16 @@ export const DEFAULT_CHAT_PARAMS: ChatModelParams = {
 export const DEFAULT_IMAGE_PARAMS: ImageModelParams = {
   defaultAspectRatio: '16:9',
   supportedAspectRatios: ['16:9', '9:16'],
+  apiFormat: 'gemini',
+};
+
+/**
+ * OpenAI Images API 默认参数
+ */
+export const DEFAULT_IMAGE_PARAMS_OPENAI: ImageModelParams = {
+  defaultAspectRatio: '16:9',
+  supportedAspectRatios: ['16:9', '9:16', '1:1'],
+  apiFormat: 'openai',
 };
 
 /**
@@ -331,6 +349,30 @@ export const BUILTIN_IMAGE_MODELS: ImageModelDefinition[] = [
     isBuiltIn: true,
     isEnabled: true,
     params: { ...DEFAULT_IMAGE_PARAMS },
+  },
+  {
+    id: 'gpt-image-1.5',
+    apiModel: 'gpt-image-1.5',
+    name: 'GPT Image 1.5',
+    type: 'image',
+    providerId: 'antsk',
+    endpoint: '/v1/images/generations',
+    description: 'OpenAI 格式图片生成模型，支持参考图编辑',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_IMAGE_PARAMS_OPENAI },
+  },
+  {
+    id: 'gpt-image-1-mini',
+    apiModel: 'gpt-image-1-mini',
+    name: 'GPT Image 1 Mini',
+    type: 'image',
+    providerId: 'antsk',
+    endpoint: '/v1/images/generations',
+    description: 'OpenAI 格式图片生成模型（Mini），请求格式与 GPT Image 1.5 一致',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_IMAGE_PARAMS_OPENAI },
   },
 ];
 

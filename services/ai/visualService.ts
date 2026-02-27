@@ -22,6 +22,12 @@ import {
   getSceneNegativePrompt,
 } from './promptConstants';
 import { compressPromptWithLLM } from './promptCompressionService';
+import {
+  getImageApiFormat,
+  getDefaultImageEndpoint,
+  resolveOpenAiImageEndpoint,
+  mapAspectRatioToOpenAiImageSize,
+} from '../imageModelUtils';
 
 // ============================================
 // 美术指导文档生成
@@ -524,6 +530,9 @@ const buildImageApiError = (status: number, backendMessage?: string): Error => {
 const MAX_IMAGE_PROMPT_CHARS = 5000;
 const IMAGE_PROMPT_SOFT_TARGET_CHARS = 4700;
 const MAX_NEGATIVE_PROMPT_TERMS = 64;
+const OPENAI_IMAGE_QUALITY = 'medium';
+const OPENAI_IMAGE_OUTPUT_FORMAT = 'png';
+const OPENAI_IMAGE_OUTPUT_COMPRESSION = 100;
 
 const normalizePromptWhitespace = (input: string): string =>
   String(input || '')
@@ -727,6 +736,36 @@ const countEnglishWords = (text: string): number => {
   return matches ? matches.length : 0;
 };
 
+const dataUrlToImageFile = (dataUrl: string, filename: string): File | null => {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+
+  try {
+    const mimeType = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new File([bytes], filename, { type: mimeType });
+  } catch {
+    return null;
+  }
+};
+
+const extractImageFromOpenAiResponse = (response: any): string | null => {
+  const first = response?.data?.[0];
+  if (!first) return null;
+  if (first.b64_json) {
+    const format = first.output_format || OPENAI_IMAGE_OUTPUT_FORMAT;
+    return `data:image/${format};base64,${first.b64_json}`;
+  }
+  if (first.url) {
+    return String(first.url);
+  }
+  return null;
+};
+
 export const generateImage = async (
   prompt: string,
   referenceImages: string[] = [],
@@ -747,7 +786,9 @@ export const generateImage = async (
   const activeImageModel = getActiveModel('image');
   const imageRoutingFamily = resolveImageModelRoutingFamily(activeImageModel);
   const imageModelId = activeImageModel?.apiModel || activeImageModel?.id || 'gemini-3-pro-image-preview';
-  const imageModelEndpoint = activeImageModel?.endpoint || `/v1beta/models/${imageModelId}:generateContent`;
+  const imageApiFormat = getImageApiFormat(activeImageModel as any);
+  const imageModelEndpointTemplate = activeImageModel?.endpoint || getDefaultImageEndpoint(imageApiFormat, imageModelId);
+  const imageModelEndpoint = imageModelEndpointTemplate.replace('{model}', imageModelId);
   const apiKey = checkApiKey('image', activeImageModel?.id);
   const apiBase = getApiBase('image', activeImageModel?.id);
 
@@ -921,8 +962,95 @@ NEGATIVE PROMPT (strictly avoid): ${compactNegativePrompt}`;
     }
     finalPrompt = promptLimitResult.text;
 
-    const parts: any[] = [{ text: finalPrompt }];
+    const openAiReferenceSources = [...referenceImages];
+    if (continuityReferenceImage && !openAiReferenceSources.includes(continuityReferenceImage)) {
+      openAiReferenceSources.push(continuityReferenceImage);
+    }
 
+    if (imageApiFormat === 'openai') {
+      const hasOpenAiReferences = openAiReferenceSources.length > 0;
+      const openAiEndpoint = resolveOpenAiImageEndpoint(imageModelEndpoint, hasOpenAiReferences);
+      const openAiSize = mapAspectRatioToOpenAiImageSize(aspectRatio);
+
+      const response = await retryOperation(async () => {
+        let res: Response;
+        if (hasOpenAiReferences) {
+          const files = openAiReferenceSources
+            .map((img, index) => dataUrlToImageFile(img, `reference-${index + 1}.png`))
+            .filter((file): file is File => Boolean(file));
+          if (files.length === 0) {
+            throw new Error('图片生成失败：参考图格式无效，请重新上传后重试。');
+          }
+
+          const formData = new FormData();
+          formData.append('model', imageModelId);
+          formData.append('prompt', finalPrompt);
+          formData.append('size', openAiSize);
+          formData.append('quality', OPENAI_IMAGE_QUALITY);
+          formData.append('output_format', OPENAI_IMAGE_OUTPUT_FORMAT);
+          formData.append('output_compression', String(OPENAI_IMAGE_OUTPUT_COMPRESSION));
+          formData.append('n', '1');
+          files.forEach(file => formData.append('image[]', file));
+
+          res = await fetch(`${apiBase}${openAiEndpoint}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Accept': '*/*'
+            },
+            body: formData
+          });
+        } else {
+          const requestBody = {
+            model: imageModelId,
+            prompt: finalPrompt,
+            size: openAiSize,
+            quality: OPENAI_IMAGE_QUALITY,
+            output_format: OPENAI_IMAGE_OUTPUT_FORMAT,
+            output_compression: OPENAI_IMAGE_OUTPUT_COMPRESSION,
+            n: 1,
+          };
+
+          res = await fetch(`${apiBase}${openAiEndpoint}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${apiKey}`,
+              'Accept': '*/*'
+            },
+            body: JSON.stringify(requestBody)
+          });
+        }
+
+        if (!res.ok) {
+          const parsedError = await parseHttpError(res);
+          const parsedAny: any = parsedError;
+          const status = parsedAny.status || res.status;
+          throw buildImageApiError(status, parsedError.message);
+        }
+
+        return await res.json();
+      });
+
+      const openAiImage = extractImageFromOpenAiResponse(response);
+      if (openAiImage) {
+        addRenderLogWithTokens({
+          type: 'keyframe',
+          resourceId: 'image-' + Date.now(),
+          resourceName: prompt.substring(0, 50) + '...',
+          status: 'success',
+          model: imageModelId,
+          prompt: prompt,
+          duration: Date.now() - startTime
+        });
+        return openAiImage;
+      }
+
+      throw new Error('图片生成失败：OpenAI Images 未返回有效图片数据。');
+    }
+
+    // Gemini generateContent protocol
+    const parts: any[] = [{ text: finalPrompt }];
     referenceImages.forEach((imgUrl) => {
       const match = imgUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
       if (match) {

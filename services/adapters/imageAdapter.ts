@@ -5,6 +5,12 @@
 
 import { ImageModelDefinition, ImageGenerateOptions, AspectRatio } from '../../types/model';
 import { getApiKeyForModel, getApiBaseUrlForModel, getActiveImageModel } from '../modelRegistry';
+import {
+  getImageApiFormat,
+  getDefaultImageEndpoint,
+  resolveOpenAiImageEndpoint,
+  mapAspectRatioToOpenAiImageSize,
+} from '../imageModelUtils';
 import { ApiKeyError } from './chatAdapter';
 
 /**
@@ -74,6 +80,9 @@ const buildImageApiError = (status: number, backendMessage?: string): Error => {
 };
 
 const MAX_IMAGE_PROMPT_CHARS = 5000;
+const OPENAI_IMAGE_QUALITY = 'medium';
+const OPENAI_IMAGE_OUTPUT_FORMAT = 'png';
+const OPENAI_IMAGE_OUTPUT_COMPRESSION = 100;
 
 const truncatePromptToMaxChars = (
   input: string,
@@ -89,6 +98,36 @@ const truncatePromptToMaxChars = (
     wasTruncated: true,
     originalLength,
   };
+};
+
+const dataUrlToImageFile = (dataUrl: string, filename: string): File | null => {
+  const match = dataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+
+  try {
+    const mimeType = match[1];
+    const binary = atob(match[2]);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new File([bytes], filename, { type: mimeType });
+  } catch {
+    return null;
+  }
+};
+
+const extractImageFromOpenAiResponse = (response: any): string | null => {
+  const first = response?.data?.[0];
+  if (!first) return null;
+  if (first.b64_json) {
+    const format = first.output_format || OPENAI_IMAGE_OUTPUT_FORMAT;
+    return `data:image/${format};base64,${first.b64_json}`;
+  }
+  if (first.url) {
+    return String(first.url);
+  }
+  return null;
 };
 
 /**
@@ -112,7 +151,9 @@ export const callImageApi = async (
   
   const apiBase = getApiBaseUrlForModel(activeModel.id);
   const apiModel = activeModel.apiModel || activeModel.id;
-  const endpoint = activeModel.endpoint || `/v1beta/models/${apiModel}:generateContent`;
+  const apiFormat = getImageApiFormat(activeModel);
+  const endpointTemplate = activeModel.endpoint || getDefaultImageEndpoint(apiFormat, apiModel);
+  const endpoint = endpointTemplate.replace('{model}', apiModel);
   
   // 确定宽高比
   const aspectRatio = options.aspectRatio || activeModel.params.defaultAspectRatio;
@@ -157,10 +198,80 @@ export const callImageApi = async (
   }
   finalPrompt = promptLimitResult.text;
 
-  // 构建请求 parts
-  const parts: any[] = [{ text: finalPrompt }];
+  if (apiFormat === 'openai') {
+    const hasReferenceImages = Boolean(options.referenceImages?.length);
+    const resolvedEndpoint = resolveOpenAiImageEndpoint(endpoint, hasReferenceImages);
+    const openAiSize = mapAspectRatioToOpenAiImageSize(aspectRatio);
 
-  // 添加参考图片
+    const response = await retryOperation(async () => {
+      let res: Response;
+      if (hasReferenceImages) {
+        const files = (options.referenceImages || [])
+          .map((img, index) => dataUrlToImageFile(img, `reference-${index + 1}.png`))
+          .filter((file): file is File => Boolean(file));
+
+        if (files.length === 0) {
+          throw new Error('图片生成失败：参考图格式无效，请上传图片后重试。');
+        }
+
+        const formData = new FormData();
+        formData.append('model', apiModel);
+        formData.append('prompt', finalPrompt);
+        formData.append('size', openAiSize);
+        formData.append('quality', OPENAI_IMAGE_QUALITY);
+        formData.append('output_format', OPENAI_IMAGE_OUTPUT_FORMAT);
+        formData.append('output_compression', String(OPENAI_IMAGE_OUTPUT_COMPRESSION));
+        formData.append('n', '1');
+        files.forEach(file => formData.append('image[]', file));
+
+        res = await fetch(`${apiBase}${resolvedEndpoint}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': '*/*',
+          },
+          body: formData,
+        });
+      } else {
+        const requestBody = {
+          model: apiModel,
+          prompt: finalPrompt,
+          size: openAiSize,
+          quality: OPENAI_IMAGE_QUALITY,
+          output_format: OPENAI_IMAGE_OUTPUT_FORMAT,
+          output_compression: OPENAI_IMAGE_OUTPUT_COMPRESSION,
+          n: 1,
+        };
+
+        res = await fetch(`${apiBase}${resolvedEndpoint}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+            'Accept': '*/*',
+          },
+          body: JSON.stringify(requestBody),
+        });
+      }
+
+      if (!res.ok) {
+        const backendMessage = await parseHttpErrorBody(res);
+        throw buildImageApiError(res.status, backendMessage);
+      }
+
+      return await res.json();
+    });
+
+    const imageData = extractImageFromOpenAiResponse(response);
+    if (imageData) {
+      return imageData;
+    }
+
+    throw new Error('图片生成失败：OpenAI Images 未返回有效图片数据。');
+  }
+
+  // Gemini generateContent protocol
+  const parts: any[] = [{ text: finalPrompt }];
   if (options.referenceImages) {
     options.referenceImages.forEach((imgUrl) => {
       const match = imgUrl.match(/^data:(image\/[a-zA-Z]+);base64,(.+)$/);
@@ -175,7 +286,6 @@ export const callImageApi = async (
     });
   }
 
-  // 构建请求体
   const requestBody: any = {
     contents: [{
       role: 'user',
@@ -185,15 +295,12 @@ export const callImageApi = async (
       responseModalities: ['TEXT', 'IMAGE'],
     },
   };
-  
-  // 非默认宽高比需要添加 imageConfig
   if (aspectRatio !== '16:9') {
     requestBody.generationConfig.imageConfig = {
       aspectRatio: aspectRatio,
     };
   }
 
-  // 调用 API
   const response = await retryOperation(async () => {
     const res = await fetch(`${apiBase}${endpoint}`, {
       method: 'POST',
@@ -213,7 +320,6 @@ export const callImageApi = async (
     return await res.json();
   });
 
-  // 提取 base64 图片
   const candidates = response.candidates || [];
   if (candidates.length > 0 && candidates[0].content && candidates[0].content.parts) {
     for (const part of candidates[0].content.parts) {
