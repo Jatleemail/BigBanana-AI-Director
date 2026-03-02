@@ -30,7 +30,23 @@ const KEYFRAME_META_SPLITTER = '\n\n---PROMPT_META_START---';
 export interface RefImagesResult {
   images: string[];
   hasTurnaround: boolean;
+  selectedTurnaroundCount: number;
+  droppedTurnaroundCount: number;
 }
+
+const MAX_SHOT_REFERENCE_IMAGES = 5;
+
+const dedupeImageRefs = (images: string[]): string[] => {
+  const output: string[] = [];
+  const seen = new Set<string>();
+  images.forEach((img) => {
+    const normalized = String(img || '').trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    output.push(normalized);
+  });
+  return output;
+};
 
 export type VideoModelFamily = 'sora' | 'doubao-task' | 'veo-fast' | 'unknown';
 
@@ -147,15 +163,22 @@ export const routeVideoFrameInputs = (
  * 并通过 hasTurnaround 标记告知调用方，以便在提示词中正确描述。
  */
 export const getRefImagesForShot = (shot: Shot, scriptData: ProjectState['scriptData']): RefImagesResult => {
-  const referenceImages: string[] = [];
-  let hasTurnaround = false;
-  
-  if (!scriptData) return { images: referenceImages, hasTurnaround };
-  
+  const primaryImages: string[] = [];
+  const turnaroundImages: string[] = [];
+
+  if (!scriptData) {
+    return {
+      images: [],
+      hasTurnaround: false,
+      selectedTurnaroundCount: 0,
+      droppedTurnaroundCount: 0,
+    };
+  }
+
   // 1. 场景参考图（环境/氛围） - 优先级最高
   const scene = scriptData.scenes.find(s => String(s.id) === String(shot.sceneId));
   if (scene?.referenceImage) {
-    referenceImages.push(scene.referenceImage);
+    primaryImages.push(scene.referenceImage);
   }
 
   // 2. 角色参考图（外观）
@@ -169,20 +192,19 @@ export const getRefImagesForShot = (shot: Shot, scriptData: ProjectState['script
       if (varId) {
         const variation = char.variations?.find(v => v.id === varId);
         if (variation?.referenceImage) {
-          referenceImages.push(variation.referenceImage);
+          primaryImages.push(variation.referenceImage);
           return; // 使用变体图片而不是基础图片
         }
       }
 
       // 基础参考图
       if (char.referenceImage) {
-        referenceImages.push(char.referenceImage);
+        primaryImages.push(char.referenceImage);
       }
 
-      // 如果角色有已完成的九宫格造型图，追加为额外参考
+      // 九宫格造型图属于“增强参考”，只在还有余量时再补充
       if (char.turnaround?.status === 'completed' && char.turnaround.imageUrl) {
-        referenceImages.push(char.turnaround.imageUrl);
-        hasTurnaround = true;
+        turnaroundImages.push(char.turnaround.imageUrl);
       }
     });
   }
@@ -192,12 +214,23 @@ export const getRefImagesForShot = (shot: Shot, scriptData: ProjectState['script
     shot.props.forEach(propId => {
       const prop = scriptData.props.find(p => String(p.id) === String(propId));
       if (prop?.referenceImage) {
-        referenceImages.push(prop.referenceImage);
+        primaryImages.push(prop.referenceImage);
       }
     });
   }
-  
-  return { images: referenceImages, hasTurnaround };
+
+  const dedupedPrimary = dedupeImageRefs(primaryImages);
+  const primarySet = new Set(dedupedPrimary);
+  const dedupedTurnaround = dedupeImageRefs(turnaroundImages).filter((img) => !primarySet.has(img));
+  const remainingSlots = Math.max(0, MAX_SHOT_REFERENCE_IMAGES - dedupedPrimary.length);
+  const selectedTurnaround = dedupedTurnaround.slice(0, remainingSlots);
+
+  return {
+    images: [...dedupedPrimary, ...selectedTurnaround],
+    hasTurnaround: selectedTurnaround.length > 0,
+    selectedTurnaroundCount: selectedTurnaround.length,
+    droppedTurnaroundCount: Math.max(0, dedupedTurnaround.length - selectedTurnaround.length),
+  };
 };
 
 /**

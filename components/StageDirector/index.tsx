@@ -460,9 +460,8 @@ const StageDirector: React.FC<Props> = ({ project, updateProject, onApiKeyError,
     ).size;
     const effectiveReferenceCount = Math.min(5, dedupedReferenceCount);
     if (dedupedReferenceCount > 5) {
-      setToastMessage(
-        `参考图数量 ${dedupedReferenceCount} 超过模型上限，已自动限制为 5 张（含连贯性参考图）。`
-      );
+      const limitNote = continuityReferenceImage ? '（含连贯性参考图）' : '';
+      setToastMessage(`参考图数量 ${dedupedReferenceCount} 超过模型上限，已自动限制为 5 张${limitNote}。`);
     }
 
     const activeImageModel = getActiveImageModel() as any;
