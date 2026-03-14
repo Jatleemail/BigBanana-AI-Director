@@ -88,7 +88,7 @@
 *   **AI Models**:
     *   **Logic/Text**: `gpt-5.1` (高智能剧本分析)
     *   **Vision**: `gemini-3-pro-image-preview` (高速绘图)
-    *   **Video**: `veo_3_1_i2v_s_fast_fl_landscape` / `sora-2` (首尾帧视频插值)
+    *   **Video**: `veo_3_1-fast` / `sora-2` (首尾帧视频插值)
 *   **Storage**: IndexedDB (本地浏览器数据库，数据隐私安全，无后端依赖)
 
 ## 为什么选择 AntSK API？
