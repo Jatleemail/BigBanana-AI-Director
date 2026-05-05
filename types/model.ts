@@ -440,6 +440,17 @@ export const BUILTIN_CHAT_MODELS: ChatModelDefinition[] = [
     isEnabled: true,
     params: { ...DEFAULT_CHAT_PARAMS },
   },
+  {
+    id: 'qwen3.5-omni',
+    apiModel: 'qwen3.5-omni',
+    name: 'Qwen 3.5 Omni',
+    type: 'chat',
+    providerId: 'qwen',
+    description: '阿里通义千问全模态模型：支持文本、图片、音频和视频输入，适合多模态理解与内容分析',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_CHAT_PARAMS },
+  },
 ];
 
 /**
