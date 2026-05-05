@@ -15,7 +15,7 @@ import ModelConfigModal from './components/ModelConfig';
 import { ProjectState } from './types';
 import { Save, CheckCircle } from 'lucide-react';
 import { saveEpisode, loadEpisode } from './services/storageService';
-import { setGlobalApiKey } from './services/aiService';
+import { setGlobalApiKey, ApiKeyError } from './services/aiService';
 import { setLogCallback, clearLogCallback } from './services/renderLogService';
 import { useAlert } from './components/GlobalAlert';
 import { ProjectProvider, useProjectContext } from './contexts/ProjectContext';
@@ -220,12 +220,20 @@ function EpisodeWorkspace() {
     return <div className="h-screen flex items-center justify-center text-[var(--text-muted)]">加载中...</div>;
   }
 
+  const handleApiKeyError = (error: any): boolean => {
+    if (error instanceof ApiKeyError || error?.name === 'ApiKeyError') {
+      setShowModelConfig(true);
+      return true;
+    }
+    return false;
+  };
+
   const renderStage = () => {
     switch (currentEpisode.stage) {
       case 'script':
         return <StageScript project={currentEpisode} updateProject={handleUpdateProject} onShowModelConfig={() => setShowModelConfig(true)} onGeneratingChange={setIsGenerating} />;
       case 'assets':
-        return <StageAssets project={currentEpisode} updateProject={handleUpdateProject} onGeneratingChange={setIsGenerating} />;
+        return <StageAssets project={currentEpisode} updateProject={handleUpdateProject} onApiKeyError={handleApiKeyError} onShowModelConfig={() => setShowModelConfig(true)} onGeneratingChange={setIsGenerating} />;
       case 'director':
         return <StageDirector project={currentEpisode} updateProject={handleUpdateProject} onGeneratingChange={setIsGenerating} />;
       case 'export':

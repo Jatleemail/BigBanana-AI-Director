@@ -15,6 +15,20 @@ const VIDU_POLL_MAX_ATTEMPTS = 120;
 const VIDU_POLL_RETRY_MAX = 3;
 const VIDU_DEFAULT_RESOLUTION = '720p';
 
+const resolveViduApiBase = (apiBase: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return '/api/vidu-proxy';
+  }
+  return apiBase;
+};
+
+const resolveMediaUrl = (url: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return `/api/media-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
 export interface ViduVideoGenerateOptions {
   prompt: string;
   startImage: string;
@@ -45,9 +59,10 @@ export const generateVideoVidu = async (options: ViduVideoGenerateOptions): Prom
   }
 
   const isStartEndMode = !!endImage;
+  const effectiveApiBase = resolveViduApiBase(apiBase);
   const createEndpoint = isStartEndMode
-    ? `${apiBase}${VIDU_STARTEND2VIDEO_ENDPOINT}`
-    : `${apiBase}${VIDU_IMG2VIDEO_ENDPOINT}`;
+    ? `${effectiveApiBase}${VIDU_STARTEND2VIDEO_ENDPOINT}`
+    : `${effectiveApiBase}${VIDU_IMG2VIDEO_ENDPOINT}`;
 
   const images = isStartEndMode
     ? [startImage, endImage]
@@ -91,7 +106,7 @@ export const generateVideoVidu = async (options: ViduVideoGenerateOptions): Prom
   }
 
   // Step 2: Poll for result
-  const taskUrl = `${apiBase}${VIDU_TASK_ENDPOINT}/${taskId}/creations`;
+  const taskUrl = `${effectiveApiBase}${VIDU_TASK_ENDPOINT}/${taskId}/creations`;
 
   for (let attempt = 0; attempt < VIDU_POLL_MAX_ATTEMPTS; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, VIDU_POLL_INTERVAL_MS));
@@ -133,7 +148,7 @@ export const generateVideoVidu = async (options: ViduVideoGenerateOptions): Prom
 
       // Step 3: Download video and convert to base64
       const videoUrl = creations[0].url;
-      const videoRes = await fetch(videoUrl);
+      const videoRes = await fetch(resolveMediaUrl(videoUrl));
       if (!videoRes.ok) {
         throw new Error(`视频生成失败：下载结果视频失败 (HTTP ${videoRes.status})`);
       }

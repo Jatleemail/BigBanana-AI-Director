@@ -13,6 +13,20 @@ const VIDU_POLL_MAX_ATTEMPTS = 120;
 const VIDU_POLL_RETRY_MAX = 3;
 export const VIDU_DEFAULT_RESOLUTION = '1080p';
 
+const resolveViduApiBase = (apiBase: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return '/api/vidu-proxy';
+  }
+  return apiBase;
+};
+
+const resolveMediaUrl = (url: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return `/api/media-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
 export interface ViduGenerateOptions {
   prompt: string;
   referenceImages: string[];
@@ -47,7 +61,7 @@ export const generateImageVidu = async (options: ViduGenerateOptions): Promise<s
 
   // Step 1: Create task (with retry)
   const createData = await retryOperation(async () => {
-    const res = await fetch(`${apiBase}${VIDU_CREATE_ENDPOINT}`, {
+    const res = await fetch(`${resolveViduApiBase(apiBase)}${VIDU_CREATE_ENDPOINT}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -76,7 +90,7 @@ export const generateImageVidu = async (options: ViduGenerateOptions): Promise<s
   }
 
   // Step 2: Poll for result
-  const taskUrl = `${apiBase}${VIDU_TASK_ENDPOINT}/${taskId}/creations`;
+  const taskUrl = `${resolveViduApiBase(apiBase)}${VIDU_TASK_ENDPOINT}/${taskId}/creations`;
 
   for (let attempt = 0; attempt < VIDU_POLL_MAX_ATTEMPTS; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, VIDU_POLL_INTERVAL_MS));
@@ -119,7 +133,7 @@ export const generateImageVidu = async (options: ViduGenerateOptions): Promise<s
 
       // Step 3: Download image and convert to base64
       const imageUrl = creations[0].url;
-      const imageRes = await fetch(imageUrl);
+      const imageRes = await fetch(resolveMediaUrl(imageUrl));
       if (!imageRes.ok) {
         throw new Error(`图片生成失败：下载结果图片失败 (HTTP ${imageRes.status})`);
       }

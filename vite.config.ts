@@ -86,6 +86,54 @@ const createDevNewApiProxyPlugin = (): Plugin => ({
   },
 });
 
+const createDevViduProxyPlugin = (): Plugin => ({
+  name: 'dev-vidu-proxy',
+  configureServer(server) {
+    server.middlewares.use('/api/vidu-proxy', async (req: any, res: any) => {
+      try {
+        const targetPath = (req.url || '/').replace(/^\/api\/vidu-proxy/, '') || '/';
+        const targetUrl = `https://api.vidu.cn${targetPath}`;
+
+        const headers: Record<string, string> = {};
+        if (req.headers['authorization']) headers['Authorization'] = String(req.headers['authorization']);
+        if (req.headers['content-type']) headers['Content-Type'] = String(req.headers['content-type']);
+
+        const upstream = await fetch(targetUrl, {
+          method: req.method || 'GET',
+          headers,
+          body: req.method !== 'GET' && req.method !== 'HEAD'
+            ? await new Promise<string>((resolve, reject) => {
+                let body = '';
+                req.on('data', (chunk: any) => { body += chunk; });
+                req.on('end', () => resolve(body));
+                req.on('error', reject);
+              })
+            : undefined,
+          redirect: 'follow',
+        });
+
+        res.statusCode = upstream.status;
+        res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
+        const passthroughHeaders = ['content-length', 'cache-control', 'etag'];
+        passthroughHeaders.forEach((key) => {
+          const value = upstream.headers.get(key);
+          if (value) res.setHeader(key, value);
+        });
+
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+        res.end(buffer);
+      } catch (error: any) {
+        res.statusCode = 502;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({
+          error: 'Vidu proxy failed.',
+          detail: error?.message || String(error),
+        }));
+      }
+    });
+  },
+});
+
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
@@ -93,7 +141,7 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react(), createDevMediaProxyPlugin(), createDevNewApiProxyPlugin()],
+      plugins: [react(), createDevMediaProxyPlugin(), createDevNewApiProxyPlugin(), createDevViduProxyPlugin()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.ANTSK_API_KEY),
         'process.env.ANTSK_API_KEY': JSON.stringify(env.ANTSK_API_KEY)

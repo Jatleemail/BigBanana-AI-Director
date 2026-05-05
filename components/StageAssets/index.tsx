@@ -33,10 +33,11 @@ interface Props {
   project: ProjectState;
   updateProject: (updates: Partial<ProjectState> | ((prev: ProjectState) => ProjectState)) => void;
   onApiKeyError?: (error: any) => boolean;
+  onShowModelConfig?: () => void;
   onGeneratingChange?: (isGenerating: boolean) => void;
 }
 
-const StageAssets: React.FC<Props> = ({ project, updateProject, onApiKeyError, onGeneratingChange }) => {
+const StageAssets: React.FC<Props> = ({ project, updateProject, onApiKeyError, onShowModelConfig, onGeneratingChange }) => {
   const { showAlert } = useAlert();
   const [batchProgress, setBatchProgress] = useState<{current: number, total: number} | null>(null);
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
