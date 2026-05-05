@@ -22,6 +22,7 @@ import {
   chatCompletionStream,
   checkApiKey,
   getApiBase,
+  resolveModel,
   resolveRequestModel,
   parseHttpError,
   getActiveVideoModel,
@@ -255,6 +256,13 @@ export const inferVisualStyleFromImage = async (
   const apiKey = checkApiKey('chat', model);
   const requestModel = resolveRequestModel('chat', model);
   const apiBase = getApiBase('chat', model);
+  const resolvedModel = resolveModel('chat', model);
+
+  // DeepSeek 等纯文本模型不支持图片输入
+  if (resolvedModel?.providerId === 'deepseek') {
+    throw new Error('当前选择的 DeepSeek 模型不支持图片输入，请切换到 GPT、Gemini 或 Claude 等多模态模型后再试。');
+  }
+
   const endpoint = '/v1/chat/completions';
   const imageUrl = normalizeImageInput(imageDataOrUrl);
 
