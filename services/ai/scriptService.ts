@@ -258,9 +258,12 @@ export const inferVisualStyleFromImage = async (
   const apiBase = getApiBase('chat', model);
   const resolvedModel = resolveModel('chat', model);
 
-  // DeepSeek 等纯文本模型不支持图片输入
-  if (resolvedModel?.providerId === 'deepseek') {
-    throw new Error('当前选择的 DeepSeek 模型不支持图片输入，请切换到 GPT、Gemini 或 Claude 等多模态模型后再试。');
+  // 纯文本模型不支持图片输入
+  const TEXT_ONLY_PROVIDERS = new Set(['deepseek']);
+  if (resolvedModel && TEXT_ONLY_PROVIDERS.has(resolvedModel.providerId)) {
+    throw new Error(
+      `当前选择的 ${resolvedModel.name} 模型不支持图片输入，请切换到 GPT、Gemini、Claude 或 Qwen 等多模态模型后再试。`
+    );
   }
 
   const endpoint = '/v1/chat/completions';
