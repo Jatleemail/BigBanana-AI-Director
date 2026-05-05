@@ -15,19 +15,19 @@ export type ModelType = 'chat' | 'image' | 'video' | 'audio';
 /**
  * 横竖屏比例类型
  */
-export type AspectRatio = '16:9' | '9:16' | '1:1';
+export type AspectRatio = '16:9' | '9:16' | '1:1' | '3:4' | '4:3' | '21:9' | '2:3' | '3:2';
 
 /**
  * 图片模型 API 协议类型
  * gemini: Google generateContent 风格
  * openai: OpenAI Images API 风格
  */
-export type ImageApiFormat = 'gemini' | 'openai';
+export type ImageApiFormat = 'gemini' | 'openai' | 'vidu';
 
 /**
  * 视频时长类型（仅异步视频模式支持）
  */
-export type VideoDuration = 4 | 5 | 8 | 10 | 12 | 15;
+export type VideoDuration = 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16;
 
 /**
  * 视频生成模式
@@ -61,6 +61,7 @@ export interface ImageModelParams {
   defaultAspectRatio: AspectRatio;
   supportedAspectRatios: AspectRatio[];
   apiFormat?: ImageApiFormat;
+  defaultResolution?: string;
 }
 
 /**
@@ -72,6 +73,7 @@ export interface VideoModelParams {
   supportedAspectRatios: AspectRatio[];
   defaultDuration: VideoDuration;
   supportedDurations: VideoDuration[];
+  defaultResolution?: string;             // 可选，Vidu 等需指定输出分辨率的模型使用
 }
 
 /**
@@ -317,6 +319,19 @@ export const DEFAULT_VIDEO_PARAMS_DOUBAO_SEEDANCE_2_0: VideoModelParams = {
 };
 
 /**
+ * 默认视频模型参数 (Vidu Q3 Turbo)
+ * Vidu 异步任务接口，支持图生视频和首尾帧模式
+ */
+export const DEFAULT_VIDEO_PARAMS_VIDU_Q3_TURBO: VideoModelParams = {
+  mode: 'async',
+  defaultAspectRatio: '16:9',
+  supportedAspectRatios: ['16:9', '9:16', '1:1'],
+  defaultDuration: 5,
+  supportedDurations: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+  defaultResolution: '720p',
+};
+
+/**
  * 默认配音模型参数
  */
 export const DEFAULT_AUDIO_PARAMS: AudioModelParams = {
@@ -403,6 +418,17 @@ export const BUILTIN_CHAT_MODELS: ChatModelDefinition[] = [
     isEnabled: true,
     params: { ...DEFAULT_CHAT_PARAMS },
   },
+  {
+    id: 'deepseek-v4-pro',
+    apiModel: 'deepseek-v4-pro',
+    name: 'DeepSeek V4 Pro',
+    type: 'chat',
+    providerId: 'deepseek',
+    description: 'DeepSeek 最新旗舰模型：支持 extended thinking 与推理优化，适合复杂文本生成、剧本解析与深度分析',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_CHAT_PARAMS },
+  },
 ];
 
 /**
@@ -454,6 +480,23 @@ export const BUILTIN_IMAGE_MODELS: ImageModelDefinition[] = [
     isBuiltIn: true,
     isEnabled: true,
     params: { ...DEFAULT_IMAGE_PARAMS_OPENAI },
+  },
+  {
+    id: 'viduq2',
+    apiModel: 'viduq2',
+    name: 'Vidu Q2',
+    type: 'image',
+    providerId: 'vidu',
+    endpoint: '/ent/v2/reference2image',
+    description: 'Vidu 旗舰图片模型：支持文生图与参考生图（0-7张参考图），异步任务模式，支持 8 种比例与 1080p/2K/4K 分辨率',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: {
+      defaultAspectRatio: '16:9',
+      supportedAspectRatios: ['16:9', '9:16', '1:1', '3:4', '4:3', '21:9', '2:3', '3:2'],
+      apiFormat: 'vidu' as ImageApiFormat,
+      defaultResolution: '1080p',
+    },
   },
 ];
 
@@ -519,6 +562,18 @@ export const BUILTIN_VIDEO_MODELS: VideoModelDefinition[] = [
     isEnabled: true,
     params: { ...DEFAULT_VIDEO_PARAMS_DOUBAO_SEEDANCE_2_0 },
   },
+  {
+    id: 'viduq3-turbo',
+    apiModel: 'viduq3-turbo',
+    name: 'Vidu Q3 Turbo',
+    type: 'video',
+    providerId: 'vidu',
+    endpoint: '/ent/v2',
+    description: 'Vidu 旗舰视频模型：支持图生视频和首尾帧，智能切镜+音画同出，3-16秒，540p-1080p',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_VIDEO_PARAMS_VIDU_Q3_TURBO },
+  },
 ];
 
 /**
@@ -566,6 +621,20 @@ export const BUILTIN_PROVIDERS: ModelProvider[] = [
     id: 'volcengine',
     name: 'Volcengine Ark',
     baseUrl: 'https://ark.cn-beijing.volces.com',
+    isBuiltIn: true,
+    isDefault: false,
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com',
+    isBuiltIn: true,
+    isDefault: false,
+  },
+  {
+    id: 'vidu',
+    name: 'Vidu',
+    baseUrl: 'https://api.vidu.cn',
     isBuiltIn: true,
     isDefault: false,
   },

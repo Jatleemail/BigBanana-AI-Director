@@ -4,49 +4,15 @@
  */
 
 import { ImageModelDefinition, ImageGenerateOptions, AspectRatio } from '../../types/model';
-import { getApiKeyForModel, getApiBaseUrlForModel, getActiveImageModel } from '../modelRegistry';
+import { getApiBaseUrlForModel, getActiveImageModel } from '../modelRegistry';
+import { checkApiKey, retryOperation } from '../ai/apiCore';
 import {
   getImageApiFormat,
   getDefaultImageEndpoint,
   resolveOpenAiImageEndpoint,
   mapAspectRatioToOpenAiImageSize,
 } from '../imageModelUtils';
-import { ApiKeyError } from './chatAdapter';
-
-/**
- * 重试操作
- */
-const retryOperation = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  delay: number = 2000
-): Promise<T> => {
-  let lastError: Error | null = null;
-  
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      lastError = error;
-      const status = error?.status;
-      // 400/401/403 错误不重试
-      if (status === 400 ||
-          status === 401 ||
-          status === 403 ||
-          error.message?.includes('400') || 
-          error.message?.includes('401') || 
-          error.message?.includes('403')) {
-        throw error;
-      }
-      if (i < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-      }
-    }
-  }
-  
-  throw lastError;
-};
-
+import { generateImageVidu } from '../ai/viduService';
 const parseHttpErrorBody = async (res: Response): Promise<string> => {
   let errorMessage = `HTTP 错误: ${res.status}`;
   try {
@@ -144,10 +110,7 @@ export const callImageApi = async (
   }
 
   // 获取 API 配置
-  const apiKey = getApiKeyForModel(activeModel.id);
-  if (!apiKey) {
-    throw new ApiKeyError('API Key 缺失，请在设置中配置 API Key');
-  }
+  const apiKey = checkApiKey('image', activeModel.id);
   
   const apiBase = getApiBaseUrlForModel(activeModel.id);
   const apiModel = activeModel.apiModel || activeModel.id;
@@ -268,6 +231,19 @@ export const callImageApi = async (
     }
 
     throw new Error('图片生成失败：OpenAI Images 未返回有效图片数据。');
+  }
+
+  if (apiFormat === 'vidu') {
+    const resolution = activeModel.params?.defaultResolution || '1080p';
+    return await generateImageVidu({
+      prompt: finalPrompt,
+      referenceImages: options.referenceImages || [],
+      aspectRatio,
+      apiKey,
+      apiBase,
+      modelId: apiModel,
+      resolution,
+    });
   }
 
   // Gemini generateContent protocol

@@ -4,38 +4,9 @@
  */
 
 import { VideoModelDefinition, VideoGenerateOptions, AspectRatio, VideoDuration } from '../../types/model';
-import { getApiKeyForModel, getApiBaseUrlForModel, getActiveVideoModel } from '../modelRegistry';
-import { ApiKeyError } from './chatAdapter';
-
-/**
- * 重试操作
- */
-const retryOperation = async <T>(
-  operation: () => Promise<T>,
-  maxRetries: number = 3,
-  delay: number = 2000
-): Promise<T> => {
-  let lastError: Error | null = null;
-  
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await operation();
-    } catch (error: any) {
-      lastError = error;
-      if (error.message?.includes('400') || 
-          error.message?.includes('401') || 
-          error.message?.includes('403')) {
-        throw error;
-      }
-      if (i < maxRetries - 1) {
-        await new Promise(resolve => setTimeout(resolve, delay * (i + 1)));
-      }
-    }
-  }
-  
-  throw lastError;
-};
-
+import { getApiBaseUrlForModel, getActiveVideoModel } from '../modelRegistry';
+import { checkApiKey, retryOperation } from '../ai/apiCore';
+import { generateVideoVidu } from '../ai/viduVideoService';
 /**
  * 调整图片尺寸
  */
@@ -450,12 +421,31 @@ export const callVideoApi = async (
   }
 
   // 获取 API 配置
-  const apiKey = getApiKeyForModel(activeModel.id);
-  if (!apiKey) {
-    throw new ApiKeyError('API Key 缺失，请在设置中配置 API Key');
-  }
-  
+  const apiKey = checkApiKey('video', activeModel.id);
   const apiBase = getApiBaseUrlForModel(activeModel.id);
+
+  // Vidu 视频模型路由
+  if (activeModel.providerId === 'vidu') {
+    const aspectRatio = options.aspectRatio || activeModel.params.defaultAspectRatio;
+    const duration = options.duration || activeModel.params.defaultDuration;
+    const resolution = activeModel.params.defaultResolution || '720p';
+
+    if (!options.startImage) {
+      throw new Error('Vidu 视频生成需要提供首帧图片');
+    }
+
+    return generateVideoVidu({
+      prompt: options.prompt,
+      startImage: options.startImage,
+      endImage: options.endImage,
+      aspectRatio,
+      duration,
+      resolution,
+      apiKey,
+      apiBase,
+      modelId: activeModel.apiModel || activeModel.id,
+    });
+  }
 
   // 根据模式选择不同的 API
   if (activeModel.params.mode === 'async') {

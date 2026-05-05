@@ -122,6 +122,26 @@ export const checkApiKey = (type: 'chat' | 'image' | 'video' | 'audio' = 'chat',
       throw new ApiKeyError('Volcengine models require a dedicated API key at model/provider level.');
     }
 
+    const isDeepseekProvider =
+      resolvedModel.providerId === 'deepseek' ||
+      !!provider?.baseUrl?.toLowerCase().includes('deepseek.com');
+
+    if (isDeepseekProvider) {
+      const dedicatedKey = resolvedModel.apiKey || provider?.apiKey;
+      if (dedicatedKey) return dedicatedKey;
+      throw new ApiKeyError('DeepSeek models require a dedicated API key at model/provider level.');
+    }
+
+    const isViduProvider =
+      resolvedModel.providerId === 'vidu' ||
+      !!provider?.baseUrl?.toLowerCase().includes('vidu.cn');
+
+    if (isViduProvider) {
+      const dedicatedKey = resolvedModel.apiKey || provider?.apiKey;
+      if (dedicatedKey) return dedicatedKey;
+      throw new ApiKeyError('Vidu models require a dedicated API key at model/provider level.');
+    }
+
     const modelApiKey = getApiKeyForModel(resolvedModel.id);
     if (modelApiKey) return modelApiKey;
   }

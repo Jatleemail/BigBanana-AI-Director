@@ -39,9 +39,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const [editApiKey, setEditApiKey] = useState<string>(model.apiKey || '');
   const provider = getProviderById(model.providerId);
   const isVolcengineModel = model.providerId === 'volcengine';
+  const isDeepseekModel = model.providerId === 'deepseek';
+  const isViduModel = model.providerId === 'vidu';
   const modelHasApiKey = Boolean(model.apiKey?.trim());
   const providerHasApiKey = Boolean(provider?.apiKey?.trim());
   const isMissingVolcengineKey = isVolcengineModel && !modelHasApiKey && !providerHasApiKey;
+  const isMissingDeepseekKey = isDeepseekModel && !modelHasApiKey && !providerHasApiKey;
+  const isMissingViduKey = isViduModel && !modelHasApiKey && !providerHasApiKey;
 
   const handleParamChange = (key: string, value: any) => {
     const newParams = { ...editParams, [key]: value };
@@ -91,14 +95,29 @@ const ModelCard: React.FC<ModelCardProps> = ({
     </div>
   );
 
-  const renderImageParams = (params: ImageModelParams) => (
+  const renderImageParams = (params: ImageModelParams) => {
+    const apiFormatLabel =
+      params.apiFormat === 'openai' ? 'OpenAI Images' :
+      params.apiFormat === 'vidu' ? 'Vidu Reference2Image' :
+      'Gemini GenerateContent';
+
+    const ratioLabel = (ratio: string): string => {
+      const labels: Record<string, string> = {
+        '16:9': '横屏', '9:16': '竖屏', '1:1': '方形',
+        '3:4': '3:4', '4:3': '4:3', '21:9': '21:9',
+        '2:3': '2:3', '3:2': '3:2',
+      };
+      return labels[ratio] || ratio;
+    };
+
+    return (
     <div className="space-y-3">
       <div className="text-[10px] text-[var(--text-muted)]">
-        协议：{params.apiFormat === 'openai' ? 'OpenAI Images' : 'Gemini GenerateContent'}
+        协议：{apiFormatLabel}
       </div>
       <div>
         <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">默认比例</label>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           {/* 从模型的 supportedAspectRatios 读取支持的比例 */}
           {(params.supportedAspectRatios || ['16:9', '9:16']).map((ratio) => (
             <button
@@ -110,13 +129,34 @@ const ModelCard: React.FC<ModelCardProps> = ({
                   : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
               }`}
             >
-              {ratio === '16:9' ? '横屏' : ratio === '9:16' ? '竖屏' : '方形'}
+              {ratioLabel(ratio)}
             </button>
           ))}
         </div>
       </div>
+      {params.apiFormat === 'vidu' && (
+        <div>
+          <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">默认分辨率</label>
+          <div className="flex gap-2">
+            {['1080p', '2K', '4K'].map((res) => (
+              <button
+                key={res}
+                onClick={() => handleParamChange('defaultResolution', res)}
+                className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                  (editParams.defaultResolution || params.defaultResolution) === res
+                    ? 'bg-[var(--accent)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
+                }`}
+              >
+                {res}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+  };
 
   const renderVideoParams = (params: VideoModelParams) => (
     <div className="space-y-4">
@@ -158,13 +198,35 @@ const ModelCard: React.FC<ModelCardProps> = ({
           </div>
         </div>
       )}
+      {model.providerId === 'vidu' && (
+        <div>
+          <label className="text-[10px] text-[var(--text-tertiary)] block mb-1">默认分辨率</label>
+          <div className="flex gap-2">
+            {['540p', '720p', '1080p'].map((res) => (
+              <button
+                key={res}
+                onClick={() => handleParamChange('defaultResolution', res)}
+                className={`px-3 py-1.5 text-xs rounded transition-colors ${
+                  (editParams.defaultResolution || (model.params as any).defaultResolution) === res
+                    ? 'bg-[var(--accent)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-hover)] text-[var(--text-tertiary)] hover:bg-[var(--border-secondary)]'
+                }`}
+              >
+                {res}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="text-[10px] text-[var(--text-muted)]">
         模式：{
           editParams.mode === 'sync'
             ? '同步（Chat Completion）'
-            : (model.endpoint || '').includes('/contents/generations/tasks')
-              ? '异步（火山任务）'
-              : '异步（Sora 类）'
+            : model.providerId === 'vidu'
+              ? '异步（Vidu 任务）'
+              : (model.endpoint || '').includes('/contents/generations/tasks')
+                ? '异步（火山任务）'
+                : '异步（Sora 类）'
         }
       </div>
     </div>
@@ -213,11 +275,11 @@ const ModelCard: React.FC<ModelCardProps> = ({
               <span className="text-sm font-medium text-[var(--text-primary)]">{model.name}</span>
               {model.isBuiltIn && (
                 <span className={`px-1.5 py-0.5 text-[9px] rounded ${
-                  isVolcengineModel
+                  isVolcengineModel || isDeepseekModel || isViduModel
                     ? 'bg-[var(--warning-bg)] text-[var(--warning-text)]'
                     : 'bg-[var(--border-secondary)] text-[var(--text-tertiary)]'
                 }`}>
-                  {isVolcengineModel ? '火山引擎' : '内置'}
+                  {isVolcengineModel ? '火山引擎' : isDeepseekModel ? 'DeepSeek' : isViduModel ? 'Vidu' : '内置'}
                 </span>
               )}
             </div>
@@ -304,6 +366,16 @@ const ModelCard: React.FC<ModelCardProps> = ({
                   火山模型不会使用全局 API Key，请填写模型 Key 或 Volcengine 提供商 Key。
                 </p>
               )}
+              {isDeepseekModel && (
+                <p className="text-[9px] text-[var(--warning-text)] mb-1">
+                  DeepSeek 模型不会使用全局 API Key，请填写模型 Key 或 DeepSeek 提供商 Key。
+                </p>
+              )}
+              {isViduModel && (
+                <p className="text-[9px] text-[var(--warning-text)] mb-1">
+                  Vidu 模型不会使用全局 API Key，请填写模型 Key 或 Vidu 提供商 Key。
+                </p>
+              )}
               <input
                 type="password"
                 value={editApiKey}
@@ -314,6 +386,16 @@ const ModelCard: React.FC<ModelCardProps> = ({
               {isMissingVolcengineKey && (
                 <p className="text-[9px] text-[var(--error-text)] mt-1">
                   未配置火山引擎 Key，当前模型无法调用且不会回退到全局 Key。
+                </p>
+              )}
+              {isMissingDeepseekKey && (
+                <p className="text-[9px] text-[var(--error-text)] mt-1">
+                  未配置 DeepSeek Key，当前模型无法调用且不会回退到全局 Key。
+                </p>
+              )}
+              {isMissingViduKey && (
+                <p className="text-[9px] text-[var(--error-text)] mt-1">
+                  未配置 Vidu Key，当前模型无法调用且不会回退到全局 Key。
                 </p>
               )}
               {model.apiKey && (

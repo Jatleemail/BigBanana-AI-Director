@@ -7,7 +7,7 @@ export const getImageApiFormat = (
   model?: Partial<ImageModelDefinition> | null
 ): ImageApiFormat => {
   const explicitFormat = model?.params?.apiFormat;
-  if (explicitFormat === 'gemini' || explicitFormat === 'openai') {
+  if (explicitFormat === 'gemini' || explicitFormat === 'openai' || explicitFormat === 'vidu') {
     return explicitFormat;
   }
 
@@ -30,6 +30,10 @@ export const getDefaultImageEndpoint = (
 ): string => {
   if (apiFormat === 'openai') {
     return DEFAULT_OPENAI_IMAGE_ENDPOINT;
+  }
+
+  if (apiFormat === 'vidu') {
+    return '/ent/v2/reference2image';
   }
 
   return DEFAULT_GEMINI_IMAGE_ENDPOINT_TEMPLATE.replace('{model}', apiModel);

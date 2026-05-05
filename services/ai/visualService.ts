@@ -28,6 +28,7 @@ import {
   resolveOpenAiImageEndpoint,
   mapAspectRatioToOpenAiImageSize,
 } from '../imageModelUtils';
+import { generateImageVidu, VIDU_DEFAULT_RESOLUTION } from './viduService';
 
 // ============================================
 // 美术指导文档生成
@@ -1098,6 +1099,31 @@ NEGATIVE PROMPT (strictly avoid): ${compactNegativePrompt}`;
       }
 
       throw new Error('图片生成失败：OpenAI Images 未返回有效图片数据。');
+    }
+
+    if (imageApiFormat === 'vidu') {
+      const resolution = activeImageModel?.params?.defaultResolution || VIDU_DEFAULT_RESOLUTION;
+      const viduImage = await generateImageVidu({
+        prompt: finalPrompt,
+        referenceImages: effectiveReferenceImages,
+        aspectRatio,
+        apiKey,
+        apiBase,
+        modelId: imageModelId,
+        resolution,
+      });
+
+      addRenderLogWithTokens({
+        type: 'keyframe',
+        resourceId: 'image-' + Date.now(),
+        resourceName: prompt.substring(0, 50) + '...',
+        status: 'success',
+        model: imageModelId,
+        prompt: prompt,
+        duration: Date.now() - startTime
+      });
+
+      return viduImage;
     }
 
     // Gemini generateContent protocol

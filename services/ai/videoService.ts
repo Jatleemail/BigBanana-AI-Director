@@ -16,6 +16,7 @@ import {
   getSoraVideoSize,
 } from './apiCore';
 import { toFriendlyModerationMessage } from '../errorMessageService';
+import { generateVideoVidu } from './viduVideoService';
 
 const VOLCENGINE_TASK_DEFAULT_ENDPOINT = '/api/v3/contents/generations/tasks';
 const VOLCENGINE_DEFAULT_MODEL = 'doubao-seedance-1-5-pro-251215';
@@ -518,6 +519,25 @@ export const generateVideo = async (
       requestModel || resolvedVideoModelId || VOLCENGINE_DEFAULT_MODEL,
       resolvedEndpoint || VOLCENGINE_TASK_DEFAULT_ENDPOINT
     );
+  }
+
+  // Vidu 视频模型路由
+  const isViduVideoModel = resolvedEndpoint.includes('/ent/v2');
+  if (isViduVideoModel) {
+    if (!startImageBase64) {
+      throw new Error('Vidu 视频生成需要提供首帧图片');
+    }
+    return generateVideoVidu({
+      prompt,
+      startImage: startImageBase64,
+      endImage: endImageBase64,
+      aspectRatio,
+      duration,
+      resolution: (resolvedVideoModel as any)?.params?.defaultResolution || '720p',
+      apiKey,
+      apiBase,
+      modelId: requestModel || resolvedVideoModelId,
+    });
   }
 
   const isAsyncMode =
