@@ -266,7 +266,7 @@ export const inferVisualStyleFromImage = async (
     );
   }
 
-  const endpoint = '/v1/chat/completions';
+  const endpoint = resolvedModel?.endpoint || '/v1/chat/completions';
   const imageUrl = normalizeImageInput(imageDataOrUrl);
 
   const requestBody = {
