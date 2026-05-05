@@ -429,6 +429,17 @@ export const BUILTIN_CHAT_MODELS: ChatModelDefinition[] = [
     isEnabled: true,
     params: { ...DEFAULT_CHAT_PARAMS },
   },
+  {
+    id: 'qwen3.6-plus',
+    apiModel: 'qwen3.6-plus',
+    name: 'Qwen 3.6 Plus',
+    type: 'chat',
+    providerId: 'qwen',
+    description: '阿里通义千问旗舰模型：支持文本和多模态输入，适合对话、剧本解析、提示词优化与深度分析',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { ...DEFAULT_CHAT_PARAMS },
+  },
 ];
 
 /**
@@ -635,6 +646,13 @@ export const BUILTIN_PROVIDERS: ModelProvider[] = [
     id: 'vidu',
     name: 'Vidu',
     baseUrl: 'https://api.vidu.cn',
+    isBuiltIn: true,
+    isDefault: false,
+  },
+  {
+    id: 'qwen',
+    name: 'Qwen (DashScope)',
+    baseUrl: 'https://dashscope.aliyuncs.com',
     isBuiltIn: true,
     isDefault: false,
   },

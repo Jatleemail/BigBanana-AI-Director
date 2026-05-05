@@ -142,6 +142,16 @@ export const checkApiKey = (type: 'chat' | 'image' | 'video' | 'audio' = 'chat',
       throw new ApiKeyError('Vidu models require a dedicated API key at model/provider level.');
     }
 
+    const isQwenProvider =
+      resolvedModel.providerId === 'qwen' ||
+      !!provider?.baseUrl?.toLowerCase().includes('dashscope.aliyuncs.com');
+
+    if (isQwenProvider) {
+      const dedicatedKey = resolvedModel.apiKey || provider?.apiKey;
+      if (dedicatedKey) return dedicatedKey;
+      throw new ApiKeyError('Qwen models require a dedicated API key at model/provider level.');
+    }
+
     const modelApiKey = getApiKeyForModel(resolvedModel.id);
     if (modelApiKey) return modelApiKey;
   }

@@ -41,11 +41,13 @@ const ModelCard: React.FC<ModelCardProps> = ({
   const isVolcengineModel = model.providerId === 'volcengine';
   const isDeepseekModel = model.providerId === 'deepseek';
   const isViduModel = model.providerId === 'vidu';
+  const isQwenModel = model.providerId === 'qwen';
   const modelHasApiKey = Boolean(model.apiKey?.trim());
   const providerHasApiKey = Boolean(provider?.apiKey?.trim());
   const isMissingVolcengineKey = isVolcengineModel && !modelHasApiKey && !providerHasApiKey;
   const isMissingDeepseekKey = isDeepseekModel && !modelHasApiKey && !providerHasApiKey;
   const isMissingViduKey = isViduModel && !modelHasApiKey && !providerHasApiKey;
+  const isMissingQwenKey = isQwenModel && !modelHasApiKey && !providerHasApiKey;
 
   const handleParamChange = (key: string, value: any) => {
     const newParams = { ...editParams, [key]: value };
@@ -275,11 +277,11 @@ const ModelCard: React.FC<ModelCardProps> = ({
               <span className="text-sm font-medium text-[var(--text-primary)]">{model.name}</span>
               {model.isBuiltIn && (
                 <span className={`px-1.5 py-0.5 text-[9px] rounded ${
-                  isVolcengineModel || isDeepseekModel || isViduModel
+                  isVolcengineModel || isDeepseekModel || isViduModel || isQwenModel
                     ? 'bg-[var(--warning-bg)] text-[var(--warning-text)]'
                     : 'bg-[var(--border-secondary)] text-[var(--text-tertiary)]'
                 }`}>
-                  {isVolcengineModel ? '火山引擎' : isDeepseekModel ? 'DeepSeek' : isViduModel ? 'Vidu' : '内置'}
+                  {isVolcengineModel ? '火山引擎' : isDeepseekModel ? 'DeepSeek' : isViduModel ? 'Vidu' : isQwenModel ? 'Qwen' : '内置'}
                 </span>
               )}
             </div>
@@ -376,6 +378,11 @@ const ModelCard: React.FC<ModelCardProps> = ({
                   Vidu 模型不会使用全局 API Key，请填写模型 Key 或 Vidu 提供商 Key。
                 </p>
               )}
+              {isQwenModel && (
+                <p className="text-[9px] text-[var(--warning-text)] mb-1">
+                  Qwen 模型不会使用全局 API Key，请填写模型 Key 或 Qwen 提供商 Key。
+                </p>
+              )}
               <input
                 type="password"
                 value={editApiKey}
@@ -396,6 +403,11 @@ const ModelCard: React.FC<ModelCardProps> = ({
               {isMissingViduKey && (
                 <p className="text-[9px] text-[var(--error-text)] mt-1">
                   未配置 Vidu Key，当前模型无法调用且不会回退到全局 Key。
+                </p>
+              )}
+              {isMissingQwenKey && (
+                <p className="text-[9px] text-[var(--error-text)] mt-1">
+                  未配置 Qwen Key，当前模型无法调用且不会回退到全局 Key。
                 </p>
               )}
               {model.apiKey && (
