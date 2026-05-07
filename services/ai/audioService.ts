@@ -71,6 +71,20 @@ const extractTextFromMessageContent = (content: any): string => {
   return '';
 };
 
+const resolveViduApiBase = (apiBase: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return '/api/vidu-proxy';
+  }
+  return apiBase;
+};
+
+const resolveViduDownloadUrl = (url: string): string => {
+  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+    return `/api/media-proxy?url=${encodeURIComponent(url)}`;
+  }
+  return url;
+};
+
 const callViduTtsEndpoint = async (
   apiBase: string,
   endpoint: string,
@@ -79,12 +93,13 @@ const callViduTtsEndpoint = async (
   voice: string,
   timeoutMs: number
 ): Promise<string> => {
+  const effectiveApiBase = resolveViduApiBase(apiBase);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await retryOperation(async () => {
-      const res = await fetch(`${apiBase}${endpoint}`, {
+      const res = await fetch(`${effectiveApiBase}${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -115,7 +130,7 @@ const callViduTtsEndpoint = async (
       throw new Error('Vidu 语音合成未返回音频文件 URL');
     }
 
-    const audioRes = await fetch(fileUrl);
+    const audioRes = await fetch(resolveViduDownloadUrl(fileUrl));
     if (!audioRes.ok) {
       throw new Error(`Vidu 音频文件下载失败 (HTTP ${audioRes.status})`);
     }
