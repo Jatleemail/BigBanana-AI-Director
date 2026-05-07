@@ -71,6 +71,67 @@ const extractTextFromMessageContent = (content: any): string => {
   return '';
 };
 
+const callViduTtsEndpoint = async (
+  apiBase: string,
+  endpoint: string,
+  apiKey: string,
+  promptText: string,
+  voice: string,
+  timeoutMs: number
+): Promise<string> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await retryOperation(async () => {
+      const res = await fetch(`${apiBase}${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${apiKey}`,
+        },
+        body: JSON.stringify({
+          text: promptText,
+          voice_setting_voice_id: voice,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw await parseHttpError(res);
+      }
+
+      return res;
+    });
+
+    const data = await response.json();
+
+    if (data.state === 'failed') {
+      throw new Error('Vidu 语音合成任务失败');
+    }
+
+    const fileUrl: string | undefined = data.file_url;
+    if (!fileUrl) {
+      throw new Error('Vidu 语音合成未返回音频文件 URL');
+    }
+
+    const audioRes = await fetch(fileUrl);
+    if (!audioRes.ok) {
+      throw new Error(`Vidu 音频文件下载失败 (HTTP ${audioRes.status})`);
+    }
+
+    const blob = await audioRes.blob();
+    return blobToDataUrl(blob);
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`配音请求超时 (${Math.floor(timeoutMs / 1000)} 秒)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 const callSpeechEndpoint = async (
   apiBase: string,
   endpoint: string,
@@ -171,6 +232,25 @@ export const generateDubbingAudio = async (
       promptText,
       usedVoice,
       usedFormat,
+      timeoutMs
+    );
+
+    return {
+      audioDataUrl,
+      transcript: rawText,
+      usedModel,
+      usedVoice,
+      usedFormat,
+    };
+  }
+
+  if (endpoint.includes('/ent/v2/audio-tts')) {
+    const audioDataUrl = await callViduTtsEndpoint(
+      apiBase,
+      endpoint,
+      apiKey,
+      rawText,
+      usedVoice,
       timeoutMs
     );
 

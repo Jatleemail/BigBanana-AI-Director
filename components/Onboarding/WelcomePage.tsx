@@ -1,6 +1,6 @@
-import React from 'react';
-import { Sparkles } from 'lucide-react';
-import logoImg from '../../logo.png';
+import React from "react";
+import { Sparkles } from "lucide-react";
+import logoImg from "../../logo.png";
 
 interface WelcomePageProps {
   onNext: () => void;
@@ -13,9 +13,9 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onNext, onSkip }) => {
       {/* 大图区域：Logo + 装饰 */}
       <div className="relative mb-8">
         <div className="absolute -inset-8 bg-[var(--accent-bg)] rounded-full blur-3xl opacity-50"></div>
-        <img 
-          src={logoImg} 
-          alt="BigBanana AI Director" 
+        <img
+          src={logoImg}
+          alt="BigBanana AI Director"
           className="w-24 h-24 relative z-10"
         />
         <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-[var(--warning-text)] animate-pulse" />
@@ -28,7 +28,7 @@ const WelcomePage: React.FC<WelcomePageProps> = ({ onNext, onSkip }) => {
 
       {/* 核心价值 */}
       <p className="text-xl text-[var(--text-secondary)] mb-2">
-        把你的故事，变成会动的短剧
+        把你的故事，变成会动的游戏视频和短剧
       </p>
 
       {/* 说明文案 */}

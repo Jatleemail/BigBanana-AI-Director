@@ -10,12 +10,12 @@
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
     <image:image>
-      <image:loc>https://director.tree456.com/UI.png</image:loc>
+      <image:loc>https://animehub-1253429497.cos.ap-beijing.myqcloud.com/gameagent/logo.png</image:loc>
       <image:title>BigBanana AI Director homepage</image:title>
       <image:caption>AI storyboard and short video generation platform</image:caption>
     </image:image>
     <image:image>
-      <image:loc>https://director.tree456.com/logo.png</image:loc>
+      <image:loc>https://animehub-1253429497.cos.ap-beijing.myqcloud.com/gameagent/logo.png</image:loc>
       <image:title>BigBanana AI Director logo</image:title>
     </image:image>
   </url>

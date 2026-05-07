@@ -628,6 +628,18 @@ export const BUILTIN_AUDIO_MODELS: AudioModelDefinition[] = [
     isEnabled: true,
     params: { ...DEFAULT_AUDIO_PARAMS },
   },
+  {
+    id: 'vidu-audio-tts',
+    apiModel: 'audio-tts',
+    name: 'Vidu 语音合成',
+    type: 'audio',
+    providerId: 'vidu',
+    endpoint: '/ent/v2/audio-tts',
+    description: 'Vidu TTS 语音合成，支持多音色与情绪控制，同步返回音频',
+    isBuiltIn: true,
+    isEnabled: true,
+    params: { defaultVoice: 'default', outputFormat: 'mp3' },
+  },
 ];
 
 /**
