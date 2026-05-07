@@ -215,21 +215,34 @@ const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, on
             className="hidden"
             onChange={handleFileChange}
           />
-          <button
-            type="button"
-            onClick={handleFileSelect}
-            disabled={!canCloneGenerate}
-            className="w-full py-2 rounded-lg border border-[var(--accent-border)] text-[var(--accent-text)] text-[10px] font-bold uppercase tracking-wider hover:bg-[var(--accent-bg)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {isCloneGenerating ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                克隆生成中...
-              </>
-            ) : (
-              <>生成克隆配音</>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleFileSelect}
+              disabled={!canCloneGenerate}
+              className="flex-1 py-2 rounded-lg bg-[var(--accent)] text-[var(--text-primary)] text-[10px] font-bold uppercase tracking-wider hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isCloneGenerating ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  克隆生成中...
+                </>
+              ) : (
+                <>生成克隆配音</>
+              )}
+            </button>
+            {shot.dubbing && (
+              <button
+                type="button"
+                onClick={onClearDubbing}
+                disabled={isBusy}
+                className="px-3 py-2 rounded-lg border border-[var(--border-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                title="清除当前配音"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
             )}
-          </button>
+          </div>
         </>
       )}
 
