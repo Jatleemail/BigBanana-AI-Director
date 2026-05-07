@@ -147,6 +147,114 @@ const callViduTtsEndpoint = async (
   }
 };
 
+const generateVoiceId = (): string => {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substring(2, 6);
+  return `clone_${timestamp}${random}`;
+};
+
+export interface CloneVoiceViduOptions {
+  audioUrl: string;
+  text: string;
+  apiKey: string;
+  apiBase: string;
+  voice?: string;
+  timeoutMs?: number;
+}
+
+const callCloneViduEndpoint = async (
+  apiBase: string,
+  apiKey: string,
+  audioUrl: string,
+  text: string,
+  voice: string,
+  timeoutMs: number
+): Promise<string> => {
+  const effectiveApiBase = resolveViduApiBase(apiBase);
+  const voiceId = generateVoiceId();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await retryOperation(async () => {
+      const res = await fetch(`${effectiveApiBase}/ent/v2/audio-clone`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Token ${apiKey}`,
+        },
+        body: JSON.stringify({
+          audio_url: audioUrl,
+          voice_id: voiceId,
+          text,
+        }),
+        signal: controller.signal,
+      });
+
+      if (!res.ok) {
+        throw await parseHttpError(res);
+      }
+
+      return res;
+    });
+
+    const data = await response.json();
+
+    if (data.state !== 'success') {
+      throw new Error(`Vidu 声音克隆任务未成功 (状态: ${data.state || 'unknown'})`);
+    }
+
+    const demoAudioUrl: string | undefined = data.demo_audio;
+    if (!demoAudioUrl) {
+      throw new Error('Vidu 声音克隆未返回试听音频 URL');
+    }
+
+    const audioRes = await fetch(resolveViduDownloadUrl(demoAudioUrl));
+    if (!audioRes.ok) {
+      throw new Error(`克隆音频下载失败 (HTTP ${audioRes.status})`);
+    }
+
+    const blob = await audioRes.blob();
+    return blobToDataUrl(blob);
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      throw new Error(`声音克隆请求超时 (${Math.floor(timeoutMs / 1000)} 秒)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+export const cloneVoiceVidu = async (
+  options: CloneVoiceViduOptions
+): Promise<GenerateDubbingAudioResult> => {
+  const rawText = String(options.text || '').trim();
+  if (!rawText) {
+    throw new Error('配音文本不能为空');
+  }
+
+  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const usedVoice = options.voice || 'default';
+
+  const audioDataUrl = await callCloneViduEndpoint(
+    options.apiBase,
+    options.apiKey,
+    options.audioUrl,
+    rawText,
+    usedVoice,
+    timeoutMs
+  );
+
+  return {
+    audioDataUrl,
+    transcript: rawText,
+    usedModel: 'vidu-audio-tts',
+    usedVoice,
+    usedFormat: 'mp3',
+  };
+};
+
 const callSpeechEndpoint = async (
   apiBase: string,
   endpoint: string,

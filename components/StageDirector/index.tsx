@@ -11,7 +11,8 @@ import {
   StoryboardGridPanelCount,
   DubbingMode,
 } from '../../types';
-import { generateImage, generateVideo, generateActionSuggestion, optimizeKeyframePrompt, optimizeBothKeyframes, enhanceKeyframePrompt, splitShotIntoSubShots, generateNineGridPanels, translateNineGridPanels, reviseNineGridPanelsByInstruction, generateNineGridImage, getNegativePrompt, compressPromptWithLLM, generateDubbingAudio } from '../../services/aiService';
+import { generateImage, generateVideo, generateActionSuggestion, optimizeKeyframePrompt, optimizeBothKeyframes, enhanceKeyframePrompt, splitShotIntoSubShots, generateNineGridPanels, translateNineGridPanels, reviseNineGridPanelsByInstruction, generateNineGridImage, getNegativePrompt, compressPromptWithLLM, generateDubbingAudio, cloneVoiceVidu, checkApiKey, getApiBase } from '../../services/aiService';
+import { uploadAudioToCos } from '../../services/cosService';
 import { 
   getRefImagesForShot, 
   getPropsInfoForShot,
@@ -841,6 +842,80 @@ const StageDirector: React.FC<Props> = ({ project, updateProject, onApiKeyError,
 
       if (onApiKeyError && onApiKeyError(e)) return;
       showAlert(`配音生成失败: ${formatUserFriendlyError(e, '请稍后重试。')}`, { type: 'error' });
+    }
+  };
+
+  /**
+   * 生成克隆配音（Vidu 声音复刻）
+   */
+  const handleGenerateCloneDubbing = async (
+    shot: Shot,
+    mode: DubbingMode,
+    text: string,
+    modelId: string,
+    audioFile: File
+  ) => {
+    const cleanText = (text || '').trim();
+    if (!cleanText) {
+      showAlert(mode === 'dialogue' ? '请先填写对话文本' : '请先填写旁白文本', { type: 'warning' });
+      return;
+    }
+
+    updateShot(shot.id, (s) => ({
+      ...s,
+      dubbing: {
+        mode,
+        text: cleanText,
+        modelId,
+        status: 'generating',
+      },
+    }));
+
+    try {
+      const audioUrl = await uploadAudioToCos(audioFile);
+
+      const apiKey = checkApiKey('audio', modelId);
+      const apiBase = getApiBase('audio', modelId);
+
+      const result = await cloneVoiceVidu({
+        audioUrl,
+        text: cleanText,
+        apiKey,
+        apiBase,
+      });
+
+      updateShot(shot.id, (s) => ({
+        ...s,
+        dubbing: {
+          mode,
+          text: cleanText,
+          modelId,
+          voice: result.usedVoice,
+          outputFormat: result.usedFormat,
+          transcript: result.transcript,
+          audioUrl: result.audioDataUrl,
+          status: 'completed',
+          generatedAt: Date.now(),
+        },
+      }));
+
+      showAlert('克隆配音生成成功', { type: 'success' });
+    } catch (e: any) {
+      console.error('克隆配音生成失败:', e);
+
+      updateShot(shot.id, (s) => ({
+        ...s,
+        dubbing: {
+          mode,
+          text: cleanText,
+          modelId,
+          status: 'failed',
+          error: formatUserFriendlyError(e, '克隆配音生成失败，请稍后重试。'),
+        },
+      }));
+
+      if (onApiKeyError && onApiKeyError(e)) return;
+      showAlert(`克隆配音生成失败: ${formatUserFriendlyError(e, '请稍后重试。')}`, { type: 'error' });
     }
   };
 
@@ -1870,6 +1945,7 @@ const StageDirector: React.FC<Props> = ({ project, updateProject, onApiKeyError,
             onToggleAIEnhancement={() => setUseAIEnhancement(!useAIEnhancement)}
             onGenerateVideo={(aspectRatio, duration, modelId) => handleGenerateVideo(activeShot, aspectRatio, duration, modelId)}
             onGenerateDubbing={(mode, text, modelId) => handleGenerateDubbing(activeShot, mode, text, modelId)}
+            onGenerateCloneDubbing={(mode, text, modelId, audioFile) => handleGenerateCloneDubbing(activeShot, mode, text, modelId, audioFile)}
             onClearDubbing={() =>
               updateShot(activeShot.id, (s) => ({
                 ...s,

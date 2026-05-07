@@ -82,6 +82,8 @@ export {
 // 配音生成服务
 export {
   generateDubbingAudio,
+  cloneVoiceVidu,
+  type CloneVoiceViduOptions,
   type DubbingMode,
   type GenerateDubbingAudioOptions,
   type GenerateDubbingAudioResult,

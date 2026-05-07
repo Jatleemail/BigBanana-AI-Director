@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Mic, Loader2, Trash2 } from 'lucide-react';
 import { Shot, DubbingMode } from '../../types';
 import { getAudioModels, getActiveAudioModel } from '../../services/modelRegistry';
@@ -7,10 +7,11 @@ import { AudioModelDefinition } from '../../types/model';
 interface DubbingPanelProps {
   shot: Shot;
   onGenerateDubbing: (mode: DubbingMode, text: string, modelId?: string) => void;
+  onGenerateCloneDubbing: (mode: DubbingMode, text: string, modelId: string, audioFile: File) => void;
   onClearDubbing: () => void;
 }
 
-const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, onClearDubbing }) => {
+const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, onGenerateCloneDubbing, onClearDubbing }) => {
   const audioModels = getAudioModels().filter((m) => m.isEnabled);
   const activeAudioModel = getActiveAudioModel();
 
@@ -28,6 +29,43 @@ const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, on
     [dubbingMode, shot.dialogue, shot.actionSummary]
   );
   const canGenerateDubbing = dubbingText.trim().length > 0 && !!selectedAudioModelId && !isGeneratingDubbing;
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isCloneGenerating, setIsCloneGenerating] = useState(false);
+  const isViduModel = selectedAudioModelId === 'vidu-audio-tts';
+  const isBusy = isGeneratingDubbing || isCloneGenerating;
+  const canCloneGenerate = dubbingText.trim().length > 0 && !!selectedAudioModelId && !isBusy;
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('audio/') && !file.name.endsWith('.mp3')) {
+      alert('请选择 mp3 音频文件');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    const maxSize = 20 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('音频文件大小不能超过 20MB');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    setIsCloneGenerating(true);
+    onGenerateCloneDubbing(dubbingMode, dubbingText.trim(), selectedAudioModelId, file);
+  };
+
+  useEffect(() => {
+    if (shot.dubbing?.status !== 'generating' && isCloneGenerating) {
+      setIsCloneGenerating(false);
+    }
+  }, [shot.dubbing?.status, isCloneGenerating]);
 
   useEffect(() => {
     const initialMode = shot.dubbing?.mode || 'narration';
@@ -159,7 +197,7 @@ const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, on
           <button
             type="button"
             onClick={onClearDubbing}
-            disabled={isGeneratingDubbing}
+            disabled={isBusy}
             className="px-3 py-2 rounded-lg border border-[var(--border-secondary)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             title="清除当前配音"
           >
@@ -167,6 +205,33 @@ const DubbingPanel: React.FC<DubbingPanelProps> = ({ shot, onGenerateDubbing, on
           </button>
         )}
       </div>
+
+      {isViduModel && (
+        <>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".mp3,audio/mp3"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <button
+            type="button"
+            onClick={handleFileSelect}
+            disabled={!canCloneGenerate}
+            className="w-full py-2 rounded-lg border border-[var(--accent-border)] text-[var(--accent-text)] text-[10px] font-bold uppercase tracking-wider hover:bg-[var(--accent-bg)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {isCloneGenerating ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                克隆生成中...
+              </>
+            ) : (
+              <>生成克隆配音</>
+            )}
+          </button>
+        </>
+      )}
 
       {shot.dubbing?.error && <p className="text-[9px] text-[var(--error-text)]">{shot.dubbing.error}</p>}
 

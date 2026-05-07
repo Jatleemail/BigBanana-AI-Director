@@ -144,7 +144,12 @@ export default defineConfig(({ mode }) => {
       plugins: [react(), createDevMediaProxyPlugin(), createDevNewApiProxyPlugin(), createDevViduProxyPlugin()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.ANTSK_API_KEY),
-        'process.env.ANTSK_API_KEY': JSON.stringify(env.ANTSK_API_KEY)
+        'process.env.ANTSK_API_KEY': JSON.stringify(env.ANTSK_API_KEY),
+        'process.env.TENCENT_COS_SECRET_ID': JSON.stringify(env.TENCENT_COS_SECRET_ID),
+        'process.env.TENCENT_COS_SECRET_KEY': JSON.stringify(env.TENCENT_COS_SECRET_KEY),
+        'process.env.TENCENT_COS_REGION': JSON.stringify(env.TENCENT_COS_REGION),
+        'process.env.TENCENT_COS_BUCKET': JSON.stringify(env.TENCENT_COS_BUCKET),
+        'process.env.TENCENT_COS_CDN_DOMAIN': JSON.stringify(env.TENCENT_COS_CDN_DOMAIN),
       },
       resolve: {
         alias: {

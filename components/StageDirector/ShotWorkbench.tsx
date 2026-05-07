@@ -74,6 +74,7 @@ interface ShotWorkbenchProps {
   onToggleAIEnhancement: () => void;
   onGenerateVideo: (aspectRatio: AspectRatio, duration: VideoDuration, modelId: string) => void;
   onGenerateDubbing: (mode: DubbingMode, text: string, modelId?: string) => void;
+  onGenerateCloneDubbing: (mode: DubbingMode, text: string, modelId: string, audioFile: File) => void;
   onClearDubbing: () => void;
   onEditVideoPrompt: () => void;
   onVideoModelChange: (modelId: string) => void;
@@ -123,6 +124,7 @@ const ShotWorkbench: React.FC<ShotWorkbenchProps> = ({
   onToggleAIEnhancement,
   onGenerateVideo,
   onGenerateDubbing,
+  onGenerateCloneDubbing,
   onClearDubbing,
   onEditVideoPrompt,
   onVideoModelChange,
@@ -866,6 +868,7 @@ const ShotWorkbench: React.FC<ShotWorkbenchProps> = ({
               <DubbingPanel
                 shot={shot}
                 onGenerateDubbing={onGenerateDubbing}
+                onGenerateCloneDubbing={onGenerateCloneDubbing}
                 onClearDubbing={onClearDubbing}
               />
             </div>
