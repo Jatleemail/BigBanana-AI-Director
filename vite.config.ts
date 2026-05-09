@@ -1,4 +1,5 @@
 import path from 'path';
+import fs from 'fs';
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { createNewApiProxyHandler } from './server/newApiProxyCore.mjs';
@@ -86,6 +87,64 @@ const createDevNewApiProxyPlugin = (): Plugin => ({
   },
 });
 
+const CONFIG_DATA_DIR = path.resolve(__dirname, 'server-data');
+const CONFIG_FILE = path.join(CONFIG_DATA_DIR, 'config.json');
+
+const createDevConfigPlugin = (): Plugin => ({
+  name: 'dev-config-api',
+  configureServer(server) {
+    fs.mkdirSync(CONFIG_DATA_DIR, { recursive: true });
+
+    server.middlewares.use('/api/config', async (req: any, res: any) => {
+      try {
+        if (req.method === 'OPTIONS') {
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Access-Control-Allow-Methods', 'GET,PUT,OPTIONS');
+          res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+          res.statusCode = 204;
+          res.end();
+          return;
+        }
+
+        if (req.method === 'GET') {
+          let data = { modelRegistry: null, apiKey: null, cosConfig: null, updatedAt: null };
+          if (fs.existsSync(CONFIG_FILE)) {
+            try { data = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')); } catch {}
+          }
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify(data));
+          return;
+        }
+
+        if (req.method === 'PUT') {
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+          const body = JSON.parse(Buffer.concat(chunks).toString('utf8').trim() || '{}');
+          const config = {
+            modelRegistry: body.modelRegistry || null,
+            apiKey: body.apiKey || null,
+            cosConfig: body.cosConfig || null,
+            updatedAt: new Date().toISOString(),
+          };
+          fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ ok: true, updatedAt: config.updatedAt }));
+          return;
+        }
+
+        res.statusCode = 405;
+        res.end();
+      } catch (e: any) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: 'Config API error', detail: e.message }));
+      }
+    });
+  },
+});
+
 const createDevViduProxyPlugin = (): Plugin => ({
   name: 'dev-vidu-proxy',
   configureServer(server) {
@@ -141,7 +200,7 @@ export default defineConfig(({ mode }) => {
         port: 3000,
         host: '0.0.0.0',
       },
-      plugins: [react(), createDevMediaProxyPlugin(), createDevNewApiProxyPlugin(), createDevViduProxyPlugin()],
+      plugins: [react(), createDevConfigPlugin(), createDevMediaProxyPlugin(), createDevNewApiProxyPlugin(), createDevViduProxyPlugin()],
       define: {
         'process.env.API_KEY': JSON.stringify(env.ANTSK_API_KEY),
         'process.env.ANTSK_API_KEY': JSON.stringify(env.ANTSK_API_KEY),
