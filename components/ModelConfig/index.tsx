@@ -4,16 +4,17 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { X, Settings, MessageSquare, Image, Video, Mic } from 'lucide-react';
+import { X, Settings, MessageSquare, Image, Video, Mic, Cloud } from 'lucide-react';
 import { ModelType } from '../../types/model';
 import ModelList from './ModelList';
+import CosSettings from './CosSettings';
 
 interface ModelConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type TabType = 'global' | 'chat' | 'image' | 'video' | 'audio';
+type TabType = 'chat' | 'image' | 'video' | 'audio' | 'cos';
 
 const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -30,6 +31,7 @@ const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onClose }) 
     { id: 'image', label: '图片模型', icon: <Image className="w-4 h-4" /> },
     { id: 'video', label: '视频模型', icon: <Video className="w-4 h-4" /> },
     { id: 'audio', label: '配音模型', icon: <Mic className="w-4 h-4" /> },
+    { id: 'cos', label: '腾讯云COS', icon: <Cloud className="w-4 h-4" /> },
   ];
 
   return (
@@ -100,16 +102,20 @@ const ModelConfigModal: React.FC<ModelConfigModalProps> = ({ isOpen, onClose }) 
 
         {/* 内容区域 */}
         <div className="flex-1 overflow-y-auto p-6" key={refreshKey}>
-          <ModelList
-            type={activeTab as ModelType}
-            onRefresh={refresh}
-          />
+          {activeTab === 'cos' ? (
+            <CosSettings onRefresh={refresh} />
+          ) : (
+            <ModelList
+              type={activeTab as ModelType}
+              onRefresh={refresh}
+            />
+          )}
         </div>
 
         {/* 底部 */}
         <div className="px-6 py-4 border-t border-[var(--border-subtle)] bg-[var(--bg-sunken)] rounded-b-xl flex-shrink-0 flex items-center justify-between">
           <p className="text-[10px] text-[var(--text-muted)] font-mono">
-            配置仅保存在本地浏览器
+            配置保存在服务器端，多用户共享
           </p>
           <button
             onClick={onClose}

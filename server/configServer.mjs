@@ -34,6 +34,8 @@ const readBody = async (req) => {
   return JSON.parse(text);
 };
 
+const EMPTY_CONFIG = { modelRegistry: null, apiKey: null, cosConfig: null, updatedAt: null };
+
 const loadConfig = () => {
   try {
     if (fs.existsSync(CONFIG_FILE)) {
@@ -42,13 +44,14 @@ const loadConfig = () => {
   } catch (e) {
     console.error('[config-server] Failed to load config:', e.message);
   }
-  return { modelRegistry: null, apiKey: null, updatedAt: null };
+  return { ...EMPTY_CONFIG };
 };
 
 const saveConfigFile = (data) => {
   const config = {
     modelRegistry: data.modelRegistry || null,
     apiKey: data.apiKey || null,
+    cosConfig: data.cosConfig || null,
     updatedAt: new Date().toISOString(),
   };
   fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), 'utf8');

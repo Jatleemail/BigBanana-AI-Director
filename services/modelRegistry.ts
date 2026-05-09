@@ -24,11 +24,12 @@ import { normalizeChatModelId } from './modelIdUtils';
 // localStorage 键名
 const STORAGE_KEY = 'bigbanana_model_registry';
 const API_KEY_STORAGE_KEY = 'antsk_api_key';
+const COS_CONFIG_KEY = 'bigbanana_cos_config';
+const CONFIG_SYNCED_AT_KEY = 'bigbanana_config_synced_at';
 
 // Server-side config sync
 const CONFIG_SERVER_URL = '/api/config';
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-let lastSyncedAt: string | null = null;
 
 // 规范化 URL（去尾部斜杠、转小写）用于去重
 const normalizeBaseUrl = (url: string): string => url.trim().replace(/\/+$/, '').toLowerCase();
@@ -42,7 +43,8 @@ let registryState: ModelRegistryState | null = null;
 
 /**
  * 从服务器拉取配置并合并到 localStorage
- * 服务器数据优先，本地数据作为离线后备
+ * 服务器数据优先，本地数据作为离线后备。
+ * 返回 true 表示服务器数据比本地新，调用方应触发页面刷新以应用新配置。
  */
 export const syncFromServer = async (): Promise<boolean> => {
   try {
@@ -50,16 +52,30 @@ export const syncFromServer = async (): Promise<boolean> => {
     if (!response.ok) return false;
     const data = await response.json();
 
+    const serverUpdatedAt = data.updatedAt || '';
+    const localSyncedAt = localStorage.getItem(CONFIG_SYNCED_AT_KEY) || '';
+
+    // 服务器没有更新时间戳，说明还未写入过配置
+    if (!serverUpdatedAt) return false;
+
+    // 本地已是最新，无需更新
+    if (localSyncedAt && serverUpdatedAt <= localSyncedAt) return false;
+
+    // 服务器数据更新，写入 localStorage
     if (data.modelRegistry) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data.modelRegistry));
-      if (data.apiKey) {
-        localStorage.setItem(API_KEY_STORAGE_KEY, data.apiKey);
-      }
-      lastSyncedAt = data.updatedAt;
-      registryState = null; // 强制下次重新加载
-      return true;
+      registryState = null;
     }
-    return false;
+    if (data.apiKey) {
+      localStorage.setItem(API_KEY_STORAGE_KEY, data.apiKey);
+    }
+    if (data.cosConfig) {
+      localStorage.setItem(COS_CONFIG_KEY, JSON.stringify(data.cosConfig));
+    }
+
+    localStorage.setItem(CONFIG_SYNCED_AT_KEY, serverUpdatedAt);
+    // 只在有实质数据时返回 true（空配置服务端 updatedAt 无意义）
+    return !!(data.modelRegistry || data.apiKey);
   } catch {
     return false;
   }
@@ -71,9 +87,11 @@ export const syncFromServer = async (): Promise<boolean> => {
 export const syncToServer = async (): Promise<boolean> => {
   try {
     const state = loadRegistry();
+    const cosConfigRaw = localStorage.getItem(COS_CONFIG_KEY);
     const payload = {
       modelRegistry: state,
       apiKey: localStorage.getItem(API_KEY_STORAGE_KEY) || null,
+      cosConfig: cosConfigRaw ? JSON.parse(cosConfigRaw) : null,
     };
     const response = await fetch(CONFIG_SERVER_URL, {
       method: 'PUT',
@@ -82,7 +100,9 @@ export const syncToServer = async (): Promise<boolean> => {
     });
     if (response.ok) {
       const data = await response.json();
-      lastSyncedAt = data.updatedAt;
+      if (data.updatedAt) {
+        localStorage.setItem(CONFIG_SYNCED_AT_KEY, data.updatedAt);
+      }
       return true;
     }
     return false;

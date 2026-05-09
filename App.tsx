@@ -469,28 +469,17 @@ function AppRoutes() {
   const [apiKey, setApiKeyState] = useState("");
 
   useEffect(() => {
-    const hadLocalKey = !!localStorage.getItem("antsk_api_key");
-
     // 先从本地加载（快速渲染），再异步从服务器同步最新配置
-    if (hadLocalKey) {
-      setApiKeyState(localStorage.getItem("antsk_api_key")!);
-      setGlobalApiKey(localStorage.getItem("antsk_api_key")!);
+    const storedKey = localStorage.getItem("antsk_api_key");
+    if (storedKey) {
+      setApiKeyState(storedKey);
+      setGlobalApiKey(storedKey);
     }
     if (shouldShowOnboarding()) setShowOnboarding(true);
 
+    // 服务器有更新时自动刷新，确保所有用户使用统一的模型配置
     syncFromServer().then((synced) => {
-      if (synced) {
-        const newKey = localStorage.getItem("antsk_api_key");
-        // 如果本地没有配置，但服务器有，刷新页面以应用服务器配置
-        if (!hadLocalKey && newKey) {
-          window.location.reload();
-          return;
-        }
-        if (newKey) {
-          setApiKeyState(newKey);
-          setGlobalApiKey(newKey);
-        }
-      }
+      if (synced) window.location.reload();
     });
   }, []);
 
