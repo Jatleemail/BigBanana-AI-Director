@@ -25,11 +25,78 @@ import { normalizeChatModelId } from './modelIdUtils';
 const STORAGE_KEY = 'bigbanana_model_registry';
 const API_KEY_STORAGE_KEY = 'antsk_api_key';
 
+// Server-side config sync
+const CONFIG_SERVER_URL = '/api/config';
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+let lastSyncedAt: string | null = null;
+
 // 规范化 URL（去尾部斜杠、转小写）用于去重
 const normalizeBaseUrl = (url: string): string => url.trim().replace(/\/+$/, '').toLowerCase();
 
 // 运行时状态缓存
 let registryState: ModelRegistryState | null = null;
+
+// ============================================
+// Server-side sync
+// ============================================
+
+/**
+ * 从服务器拉取配置并合并到 localStorage
+ * 服务器数据优先，本地数据作为离线后备
+ */
+export const syncFromServer = async (): Promise<boolean> => {
+  try {
+    const response = await fetch(CONFIG_SERVER_URL);
+    if (!response.ok) return false;
+    const data = await response.json();
+
+    if (data.modelRegistry) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.modelRegistry));
+      if (data.apiKey) {
+        localStorage.setItem(API_KEY_STORAGE_KEY, data.apiKey);
+      }
+      lastSyncedAt = data.updatedAt;
+      registryState = null; // 强制下次重新加载
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * 将当前配置推送到服务器
+ */
+export const syncToServer = async (): Promise<boolean> => {
+  try {
+    const state = loadRegistry();
+    const payload = {
+      modelRegistry: state,
+      apiKey: localStorage.getItem(API_KEY_STORAGE_KEY) || null,
+    };
+    const response = await fetch(CONFIG_SERVER_URL, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (response.ok) {
+      const data = await response.json();
+      lastSyncedAt = data.updatedAt;
+      return true;
+    }
+    return false;
+  } catch {
+    return false;
+  }
+};
+
+const debouncedSyncToServer = () => {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+  syncDebounceTimer = setTimeout(() => {
+    syncToServer().catch(() => {});
+  }, 2000);
+};
 
 // ============================================
 // 状态管理
@@ -277,6 +344,8 @@ export const saveRegistry = (state: ModelRegistryState): void => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     registryState = state;
+    // Sync to server (debounced, fire-and-forget)
+    debouncedSyncToServer();
   } catch (e) {
     console.error('保存模型注册中心失败:', e);
   }

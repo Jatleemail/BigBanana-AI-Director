@@ -19,6 +19,7 @@ import { ProjectState } from "./types";
 import { Save, CheckCircle } from "lucide-react";
 import { saveEpisode, loadEpisode } from "./services/storageService";
 import { setGlobalApiKey, ApiKeyError } from "./services/aiService";
+import { syncFromServer } from "./services/modelRegistry";
 import { setLogCallback, clearLogCallback } from "./services/renderLogService";
 import { useAlert } from "./components/GlobalAlert";
 import { ProjectProvider, useProjectContext } from "./contexts/ProjectContext";
@@ -468,12 +469,29 @@ function AppRoutes() {
   const [apiKey, setApiKeyState] = useState("");
 
   useEffect(() => {
-    const storedKey = localStorage.getItem("antsk_api_key");
-    if (storedKey) {
-      setApiKeyState(storedKey);
-      setGlobalApiKey(storedKey);
+    const hadLocalKey = !!localStorage.getItem("antsk_api_key");
+
+    // 先从本地加载（快速渲染），再异步从服务器同步最新配置
+    if (hadLocalKey) {
+      setApiKeyState(localStorage.getItem("antsk_api_key")!);
+      setGlobalApiKey(localStorage.getItem("antsk_api_key")!);
     }
     if (shouldShowOnboarding()) setShowOnboarding(true);
+
+    syncFromServer().then((synced) => {
+      if (synced) {
+        const newKey = localStorage.getItem("antsk_api_key");
+        // 如果本地没有配置，但服务器有，刷新页面以应用服务器配置
+        if (!hadLocalKey && newKey) {
+          window.location.reload();
+          return;
+        }
+        if (newKey) {
+          setApiKeyState(newKey);
+          setGlobalApiKey(newKey);
+        }
+      }
+    });
   }, []);
 
   useEffect(() => {

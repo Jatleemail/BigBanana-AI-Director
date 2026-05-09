@@ -9,6 +9,7 @@ services:
     depends_on:
       - media-proxy
       - new-api-proxy
+      - config-server
     restart: unless-stopped
 
   media-proxy:
@@ -39,3 +40,19 @@ services:
     expose:
       - "8788"
     restart: unless-stopped
+
+  config-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.config-server
+    container_name: bigbanana-config-server
+    volumes:
+      - config-data:/app/server-data
+    environment:
+      CONFIG_SERVER_PORT: "8789"
+    expose:
+      - "8789"
+    restart: unless-stopped
+
+volumes:
+  config-data:

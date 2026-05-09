@@ -1,0 +1,13 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY server/configServer.mjs ./server/configServer.mjs
+
+RUN mkdir -p /app/server-data
+
+ENV CONFIG_SERVER_PORT=8789
+
+EXPOSE 8789
+
+CMD ["node", "server/configServer.mjs"]
