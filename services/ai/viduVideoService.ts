@@ -15,15 +15,15 @@ const VIDU_POLL_MAX_ATTEMPTS = 120;
 const VIDU_POLL_RETRY_MAX = 3;
 const VIDU_DEFAULT_RESOLUTION = '720p';
 
-const resolveViduApiBase = (apiBase: string): string => {
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+const resolveViduApiBase = (_apiBase: string): string => {
+  if (typeof window !== 'undefined') {
     return '/api/vidu-proxy';
   }
-  return apiBase;
+  return _apiBase;
 };
 
 const resolveMediaUrl = (url: string): string => {
-  if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  if (typeof window !== 'undefined') {
     return `/api/media-proxy?url=${encodeURIComponent(url)}`;
   }
   return url;
